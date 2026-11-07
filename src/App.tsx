@@ -186,9 +186,12 @@ export default function App() {
             if (child.isMesh) {
               child.material = child.material.clone();
               child.material.needsUpdate = true;
+              child.material.emissive = new THREE.Color(0xef4444);
+              child.material.emissiveIntensity = 1.0;
+              child.material.side = THREE.DoubleSide;
             }
           });
-          clone.scale.setScalar(1.5);
+          clone.scale.setScalar(2.0);
           clone.position.set(0, 0, 0);
           clone.updateMatrixWorld();
           console.log('HeartMesh: GLTF carregado, children:', clone.children.length);
@@ -197,6 +200,31 @@ export default function App() {
         if (modelRef.current) {
           groupRef.current!.add(modelRef.current.clone());
         }
+
+        // Coração procedural garantido para visibilidade imediata
+        const heartShape = new THREE.Shape();
+        const x = 0, y = 0;
+        heartShape.moveTo(x + 0.5, y + 0.5);
+        heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
+        heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
+        heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
+        heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
+        heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
+        heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
+        heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
+        heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
+
+        const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
+        const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+        geometry.center();
+
+        const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.x = Math.PI / 2;
+        mesh.position.set(0, 0, 0);
+        mesh.scale.setScalar(1.2);
+        mesh.name = 'heart-procedural';
+        groupRef.current!.add(mesh);
       }
     }, [scene, disassembled]);
 
