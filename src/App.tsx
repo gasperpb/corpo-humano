@@ -149,14 +149,16 @@ export default function App() {
 
       if (!disassembled) {
         const clone = scene.clone();
-        clone.traverse((child) => {
+        clone.traverse((child: any) => {
           if (child.isMesh) {
             child.material = child.material.clone();
             child.material.needsUpdate = true;
           }
         });
-        clone.scale.setScalar(0.9);
+        clone.scale.setScalar(1.5);
         clone.position.set(0, 0, 0);
+        clone.updateMatrixWorld();
+        console.log('HeartMesh: modelo carregado, children:', clone.children.length);
         groupRef.current!.add(clone);
       } else {
         partsRef.current.forEach(({ mesh }) => {
@@ -168,7 +170,7 @@ export default function App() {
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += rotationSpeed * 100;
+        groupRef.current.rotation.y += rotationSpeed * 10;
         if (selectedOrgan === 'heart') {
           const pulse = 1 + Math.sin(state.elapsedTime * (heartRate / 15)) * 0.05;
           groupRef.current.scale.set(pulse, pulse, pulse);
@@ -293,7 +295,7 @@ export default function App() {
     useFrame((state: any) => {
       if (!groupRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += rotationSpeed * 100;
+        groupRef.current.rotation.y += rotationSpeed * 10;
       } else {
         partsRef.current.forEach(({ mesh, offset, part }) => {
           mesh.position.lerp(new THREE.Vector3(offset.x * 2.5, offset.y * 2.5, offset.z * 2.5), 0.08);
