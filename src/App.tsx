@@ -143,37 +143,48 @@ export default function App() {
     const groupRef = useRef<THREE.Group>(null);
     const { scene } = useGLTF('/models/realistic_human_heart/scene.gltf');
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
-    const [gltfLoaded, setGltfLoaded] = useState(false);
-    const heartGroupRef = useRef<THREE.Group>(null);
+    const modelRef = useRef<THREE.Group | null>(null);
 
     useEffect(() => {
       if (!groupRef.current) return;
+      groupRef.current!.clear();
+
       if (disassembled) {
+        if (partsRef.current.length === 0 && scene) {
+          scene.traverse((child: any) => {
+            if (child.isMesh) {
+              const mesh = child.clone();
+              mesh.material = child.material.clone();
+              mesh.material.needsUpdate = true;
+              mesh.position.set(0, 0, 0);
+              mesh.userData = { partId: 'modelo-completo' };
+              partsRef.current.push({ mesh, offset: new THREE.Vector3(0, 0, 0), part: heartParts[0] });
+            }
+          });
+        }
         partsRef.current.forEach(({ mesh }) => {
           groupRef.current!.add(mesh);
         });
-        return;
+      } else {
+        if (scene && !modelRef.current) {
+          const clone = scene.clone();
+          clone.traverse((child: any) => {
+            if (child.isMesh) {
+              child.material = child.material.clone();
+              child.material.needsUpdate = true;
+            }
+          });
+          clone.scale.setScalar(1.5);
+          clone.position.set(0, 0, 0);
+          clone.updateMatrixWorld();
+          console.log('HeartMesh: GLTF carregado, children:', clone.children.length);
+          modelRef.current = clone;
+        }
+        if (modelRef.current) {
+          groupRef.current!.add(modelRef.current.clone());
+        }
       }
-
-      if (scene && !gltfLoaded) {
-        const clone = scene.clone();
-        clone.traverse((child: any) => {
-          if (child.isMesh) {
-            child.material = child.material.clone();
-            child.material.needsUpdate = true;
-          }
-        });
-        clone.scale.setScalar(1.5);
-        clone.position.set(0, 0, 0);
-        clone.updateMatrixWorld();
-        console.log('HeartMesh: GLTF carregado, children:', clone.children.length);
-        setGltfLoaded(true);
-        heartGroupRef.current = clone;
-        groupRef.current!.add(clone);
-      } else if (!scene && !gltfLoaded && heartGroupRef.current) {
-        groupRef.current!.add(heartGroupRef.current.clone());
-      }
-    }, [scene, disassembled, gltfLoaded]);
+    }, [scene, disassembled]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
@@ -226,32 +237,36 @@ export default function App() {
         {disassembled && selectedOrgan === 'heart' && (
           <>
             {heartParts.map((part) => {
-              const colorMap: Record<string, number> = {
-                'atrio-direito': 0xef4444,
-                'atrio-esquerdo': 0xdc2626,
-                'ventriculo-direito': 0xb91c1c,
-                'ventriculo-esquerdo': 0x991b1b,
-                'valvula-tricuspide': 0xf97316,
-                'valvula-mitral': 0xf97316,
-                'valvula-pulmonar': 0xef4444,
-                'valvula-aortica': 0xef4444,
-                aorta: 0xb91c1c,
-                'veia-cava-superior': 0x7f1d1d,
-                'veia-cava-inferior': 0x7f1d1d,
-                'arteria-pulmonar': 0xb91c1c,
-                pericardio: 0x6b7280,
-                miocardio: 0xef4444,
-                endocardio: 0xfee2e2,
-              };
-              const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(0.25, 16, 16),
-                new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
-              );
-              mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-              mesh.userData = { partId: part.id };
-              partsRef.current.push({ mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part });
+              let partMesh = partsRef.current.find((p) => p.part.id === part.id);
+              if (!partMesh) {
+                const colorMap: Record<string, number> = {
+                  'atrio-direito': 0xef4444,
+                  'atrio-esquerdo': 0xdc2626,
+                  'ventriculo-direito': 0xb91c1c,
+                  'ventriculo-esquerdo': 0x991b1b,
+                  'valvula-tricuspide': 0xf97316,
+                  'valvula-mitral': 0xf97316,
+                  'valvula-pulmonar': 0xef4444,
+                  'valvula-aortica': 0xef4444,
+                  aorta: 0xb91c1c,
+                  'veia-cava-superior': 0x7f1d1d,
+                  'veia-cava-inferior': 0x7f1d1d,
+                  'arteria-pulmonar': 0xb91c1c,
+                  pericardio: 0x6b7280,
+                  miocardio: 0xef4444,
+                  endocardio: 0xfee2e2,
+                };
+                const mesh = new THREE.Mesh(
+                  new THREE.SphereGeometry(0.25, 16, 16),
+                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
+                );
+                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+                mesh.userData = { partId: part.id };
+                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
+                partsRef.current.push(partMesh);
+              }
               return (
-                <Html key={part.id} position={[part.pos[0] * 3, part.pos[1] * 3, part.pos[2] * 3]}>
+                <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
                   <div
                     onClick={() => setSelectedHeartPart(part.id)}
                     className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
