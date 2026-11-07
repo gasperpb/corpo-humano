@@ -8,7 +8,7 @@ export default function App() {
   const [selectedHeartPart, setSelectedHeartPart] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('explorer');
   const [disassembled, setDisassembled] = useState(false);
-  const [rotationSpeed, setRotationSpeed] = useState(0.005);
+  const [rotationSpeed, setRotationSpeed] = useState(0);
   const [heartRate, setHeartRate] = useState(72);
   const [bodyTemp, setBodyTemp] = useState(36.6);
   const [oxygenLevel, setOxygenLevel] = useState(98);
@@ -170,7 +170,7 @@ export default function App() {
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += rotationSpeed * 10;
+        groupRef.current.rotation.y += rotationSpeed;
         if (selectedOrgan === 'heart') {
           const pulse = 1 + Math.sin(state.elapsedTime * (heartRate / 15)) * 0.05;
           groupRef.current.scale.set(pulse, pulse, pulse);
@@ -295,7 +295,7 @@ export default function App() {
     useFrame((state: any) => {
       if (!groupRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += rotationSpeed * 10;
+        groupRef.current.rotation.y += rotationSpeed;
       } else {
         partsRef.current.forEach(({ mesh, offset, part }) => {
           mesh.position.lerp(new THREE.Vector3(offset.x * 2.5, offset.y * 2.5, offset.z * 2.5), 0.08);
@@ -668,7 +668,7 @@ export default function App() {
                 gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
                 style={{ width: '100%', height: '100%', display: 'block' }}
               >
-                <ambientLight intensity={0.7} />
+                <ambientLight intensity={1.2} />
                 <directionalLight position={[5, 10, 7]} intensity={1.2} />
                 <pointLight position={[-5, -5, -5]} intensity={2} color="#38bdf8" distance={50} />
                 <Environment preset="city" intensity={0.3} />
