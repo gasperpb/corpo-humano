@@ -326,41 +326,6 @@ export default function App() {
       </group>
     );
   };
-                const mesh = new THREE.Mesh(
-                  new THREE.SphereGeometry(0.25, 16, 16),
-                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
-                );
-                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-                mesh.userData = { partId: part.id };
-                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
-                partsRef.current.push(partMesh);
-              }
-              return (
-                <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
-                  <div
-                    onClick={() => setSelectedHeartPart(part.id)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
-                      selectedHeartPart === part.id
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
-                        : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
-                    }`}
-                  >
-                    {part.name}
-                  </div>
-                  {selectedHeartPart === part.id && (
-                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
-                      <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
-                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
-                    </div>
-                  )}
-                </Html>
-              );
-            })}
-          </>
-        )}
-      </group>
-    );
-  };
 
   const LungsMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
