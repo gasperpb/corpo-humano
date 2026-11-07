@@ -1,10 +1,11 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Stars, useGLTF } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment, Stars, useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
 export default function App() {
   const [selectedOrgan, setSelectedOrgan] = useState('heart');
+  const [selectedHeartPart, setSelectedHeartPart] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('explorer');
   const [disassembled, setDisassembled] = useState(false);
   const [rotationSpeed, setRotationSpeed] = useState(0.005);
@@ -94,6 +95,24 @@ export default function App() {
     },
   };
 
+  const heartParts = [
+    { id: 'atrio-direito', name: 'Átrio Direito', pos: [-0.35, 0.25, 0.15], desc: 'Recebe sangue desoxigenado do corpo através das veias cavas superior e inferior.' },
+    { id: 'atrio-esquerdo', name: 'Átrio Esquerdo', pos: [0.35, 0.25, 0.15], desc: 'Recebe sangue oxigenado dos pulmões através das veias pulmonares.' },
+    { id: 'ventriculo-direito', name: 'Ventrículo Direito', pos: [-0.35, -0.55, 0.1], desc: 'Bombeia sangue desoxigenado para os pulmões através da artéria pulmonar.' },
+    { id: 'ventriculo-esquerdo', name: 'Ventrículo Esquerdo', pos: [0.35, -0.55, 0.1], desc: 'Bombeia sangue oxigenado para todo o corpo através da aorta. É a câmara mais espessa.' },
+    { id: 'valvula-tricuspide', name: 'Válvula Tricúspide', pos: [-0.35, -0.1, 0.35], desc: 'Separa o átrio direito do ventrículo direito, impedindo o refluxo de sangue.' },
+    { id: 'valvula-mitral', name: 'Válvula Mitral', pos: [0.35, -0.1, 0.35], desc: 'Separa o átrio esquerdo do ventrículo esquerdo, impedindo o refluxo de sangue.' },
+    { id: 'valvula-pulmonar', name: 'Válvula Pulmonar', pos: [-0.35, -0.85, 0.2], desc: 'Controla a saída de sangue do ventrículo direito para os pulmões.' },
+    { id: 'valvula-aortica', name: 'Válvula Aórtica', pos: [0.35, -0.85, 0.2], desc: 'Controla a saída de sangue do ventrículo esquerdo para a aorta.' },
+    { id: 'aorta', name: 'Aorta', pos: [0.55, 0.4, -0.1], desc: 'Maior artéria do corpo, distribui sangue oxigenado do ventrículo esquerdo para todo o organismo.' },
+    { id: 'veia-cava-superior', name: 'Veia Cava Superior', pos: [-0.6, 0.6, 0.1], desc: 'Traz sangue desoxigenado da parte superior do corpo para o átrio direito.' },
+    { id: 'veia-cava-inferior', name: 'Veia Cava Inferior', pos: [-0.6, -0.9, 0.1], desc: 'Traz sangue desoxigenado da parte inferior do corpo para o átrio direito.' },
+    { id: 'arteria-pulmonar', name: 'Artéria Pulmonar', pos: [-0.55, -0.4, -0.2], desc: 'Transporta sangue desoxigenado do ventrículo direito para os pulmões.' },
+    { id: 'pericardio', name: 'Pericárdio', pos: [0, 1.1, 0.4], desc: 'Membrana fibrosa que envolve e protege o coração, reduzindo o atrito entre os órgãos.' },
+    { id: 'miocardio', name: 'Miocárdio', pos: [0, -0.2, 0.45], desc: 'Camada muscular média e espessa do coração, responsável pelas contrações.' },
+    { id: 'endocardio', name: 'Endocárdio', pos: [0, -0.6, 0.5], desc: 'Camada interna que reveste as cavidades cardíacas e as válvulas.' },
+  ];
+
   const addNotification = (msg: string) => {
     const id = Date.now();
     setNotifications((prev) => [...prev, { id, msg }]);
@@ -107,37 +126,124 @@ export default function App() {
   const HeartMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
     const { scene } = useGLTF('/models/realistic_human_heart/scene.gltf');
+    const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
 
     useEffect(() => {
       if (!groupRef.current || !scene) return;
-      const clone = scene.clone();
-      clone.traverse((child) => {
-        if (child.isMesh) {
-          child.material = child.material.clone();
-          child.material.needsUpdate = true;
-        }
-      });
-      clone.scale.setScalar(0.9);
-      clone.position.set(0, 0, 0);
-      groupRef.current!.add(clone);
-    }, [scene]);
+
+      if (!disassembled) {
+        const clone = scene.clone();
+        clone.traverse((child) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.needsUpdate = true;
+          }
+        });
+        clone.scale.setScalar(0.9);
+        clone.position.set(0, 0, 0);
+        groupRef.current!.add(clone);
+      } else {
+        partsRef.current.forEach(({ mesh }) => {
+          groupRef.current!.add(mesh);
+        });
+      }
+    }, [scene, disassembled]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += 0.005;
+        groupRef.current.rotation.y += rotationSpeed * 100;
         if (selectedOrgan === 'heart') {
           const pulse = 1 + Math.sin(state.elapsedTime * (heartRate / 15)) * 0.05;
           groupRef.current.scale.set(pulse, pulse, pulse);
         } else {
           groupRef.current.scale.set(1, 1, 1);
         }
+      } else {
+        partsRef.current.forEach(({ mesh, offset, part }) => {
+          mesh.position.lerp(new THREE.Vector3(offset.x * 3, offset.y * 3, offset.z * 3), 0.08);
+          mesh.rotation.y += 0.02;
+        });
       }
     });
 
     return (
       <group ref={groupRef} dispose={null}>
         <pointLight position={[0, 0, 4]} intensity={1} distance={15} />
+        {!disassembled && selectedOrgan === 'heart' && (
+          <>
+            {heartParts.map((part) => (
+              <Html key={part.id} position={part.pos as [number, number, number]}>
+                <div
+                  onClick={() => setSelectedHeartPart(part.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                    selectedHeartPart === part.id
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                      : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
+                  }`}
+                >
+                  {part.name}
+                </div>
+                {selectedHeartPart === part.id && (
+                  <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                    <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                  </div>
+                )}
+              </Html>
+            ))}
+          </>
+        )}
+        {disassembled && selectedOrgan === 'heart' && (
+          <>
+            {heartParts.map((part) => {
+              const colorMap: Record<string, number> = {
+                'atrio-direito': 0xef4444,
+                'atrio-esquerdo': 0xdc2626,
+                'ventriculo-direito': 0xb91c1c,
+                'ventriculo-esquerdo': 0x991b1b,
+                'valvula-tricuspide': 0xf97316,
+                'valvula-mitral': 0xf97316,
+                'valvula-pulmonar': 0xef4444,
+                'valvula-aortica': 0xef4444,
+                aorta: 0xb91c1c,
+                'veia-cava-superior': 0x7f1d1d,
+                'veia-cava-inferior': 0x7f1d1d,
+                'arteria-pulmonar': 0xb91c1c,
+                pericardio: 0x6b7280,
+                miocardio: 0xef4444,
+                endocardio: 0xfee2e2,
+              };
+              const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.25, 16, 16),
+                new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
+              );
+              mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+              mesh.userData = { partId: part.id };
+              partsRef.current.push({ mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part });
+              return (
+                <Html key={part.id} position={[part.pos[0] * 3, part.pos[1] * 3, part.pos[2] * 3]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
+          </>
+        )}
       </group>
     );
   };
@@ -573,6 +679,10 @@ export default function App() {
 
       <footer className="border-t border-slate-800/80 bg-slate-900/40 py-4 px-6 text-center text-xs text-slate-500">
         <p>BioNexus 3D Anatomy Explorer • Construído com React, React Three Fiber, Drei, Tailwind CSS e Three.js</p>
+        <p className="mt-1 text-slate-400">
+          Desenvolvido por{' '}
+          <a href="https://www.linkedin.com/in/achillesdev" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Achillesdev</a>
+        </p>
       </footer>
     </div>
   );
