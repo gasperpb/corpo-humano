@@ -143,11 +143,19 @@ export default function App() {
     const groupRef = useRef<THREE.Group>(null);
     const { scene } = useGLTF('/models/realistic_human_heart/scene.gltf');
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
+    const [gltfLoaded, setGltfLoaded] = useState(false);
+    const heartGroupRef = useRef<THREE.Group>(null);
 
     useEffect(() => {
-      if (!groupRef.current || !scene) return;
+      if (!groupRef.current) return;
+      if (disassembled) {
+        partsRef.current.forEach(({ mesh }) => {
+          groupRef.current!.add(mesh);
+        });
+        return;
+      }
 
-      if (!disassembled) {
+      if (scene && !gltfLoaded) {
         const clone = scene.clone();
         clone.traverse((child: any) => {
           if (child.isMesh) {
@@ -158,14 +166,14 @@ export default function App() {
         clone.scale.setScalar(1.5);
         clone.position.set(0, 0, 0);
         clone.updateMatrixWorld();
-        console.log('HeartMesh: modelo carregado, children:', clone.children.length);
+        console.log('HeartMesh: GLTF carregado, children:', clone.children.length);
+        setGltfLoaded(true);
+        heartGroupRef.current = clone;
         groupRef.current!.add(clone);
-      } else {
-        partsRef.current.forEach(({ mesh }) => {
-          groupRef.current!.add(mesh);
-        });
+      } else if (!scene && !gltfLoaded && heartGroupRef.current) {
+        groupRef.current!.add(heartGroupRef.current.clone());
       }
-    }, [scene, disassembled]);
+    }, [scene, disassembled, gltfLoaded]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
@@ -187,8 +195,11 @@ export default function App() {
 
     return (
       <group ref={groupRef} dispose={null}>
-        <pointLight position={[0, 0, 4]} intensity={1} distance={15} />
-        {!disassembled && selectedOrgan === 'heart' && (
+        <ambientLight intensity={1.5} />
+        <pointLight position={[0, 0, 4]} intensity={2} distance={20} />
+        <pointLight position={[4, 0, 0]} intensity={1} distance={15} />
+        <pointLight position={[-4, 0, 0]} intensity={1} distance={15} />
+        {selectedOrgan === 'heart' && !disassembled && (
           <>
             {heartParts.map((part) => (
               <Html key={part.id} position={part.pos as [number, number, number]}>
