@@ -129,6 +129,20 @@ export default function App() {
     { id: 'diafragma', name: 'Diafragma', pos: [0, -1.4, 0], desc: 'Músculo principal da respiração, separa o tórax do abdômen.' },
   ];
 
+  const stomachParts = [
+    { id: 'cardias', name: 'Cardias', pos: [-0.4, 0.5, 0], desc: 'Válvula que conecta o esôfago ao estômago, impedindo o refluxo do conteúdo gástrico.' },
+    { id: 'fundo-gastrico', name: 'Fundo Gástrico', pos: [0.4, 0.6, 0], desc: 'Porção superior do estômago, localizada acima do nível do cardias.' },
+    { id: 'corpo-gastrico', name: 'Corpo Gástrico', pos: [0, 0, 0], desc: 'Região central do estômago onde ocorre a maior parte da digestão.' },
+    { id: 'antro-piloro', name: 'Antro Pilórico', pos: [0.5, -0.3, 0], desc: 'Porção distal do estômago que regula a passagem do quimo para o duodeno.' },
+    { id: 'piloro', name: 'Piloro', pos: [0.7, -0.4, 0], desc: 'Válvula muscular que controla a saída do conteúdo gástrico para o intestino delgado.' },
+    { id: 'menor-curvatura', name: 'Menor Curvatura', pos: [-0.3, -0.2, 0], desc: 'Borda côncava medial do estômago, fixada ao fígado pelo ligamento hepato-gástrico.' },
+    { id: 'maior-curvatura', name: 'Maior Curvatura', pos: [0.6, 0.2, 0], desc: 'Borda convexa lateral do estômago, maior extensão do órgão.' },
+    { id: 'mucosa-gastrica', name: 'Mucosa Gástrica', pos: [0, -0.1, 0.3], desc: 'Revestimento interno do estômago que produz muco protetor contra os sucos gástricos.' },
+    { id: 'submucosa', name: 'Submucosa', pos: [0, -0.1, 0.35], desc: 'Camada de tecido conjuntivo que sustenta a mucosa e contém vasos e nervos.' },
+    { id: 'camada-muscular', name: 'Camada Muscular', pos: [0, -0.1, 0.4], desc: 'Camada espessa de músculo liso responsável pelos movimentos de mistura do estômago.' },
+    { id: 'serosa', name: 'Serosa', pos: [0, -0.1, 0.45], desc: 'Camada mais externa do estômago, membrana serosa que recobre o órgão.' },
+  ];
+
   const addNotification = (msg: string) => {
     const id = Date.now();
     setNotifications((prev) => [...prev, { id, msg }]);
@@ -539,28 +553,176 @@ export default function App() {
 
   const StomachMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
-    const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3 }>>([]);
-    const baseMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#f97316'), roughness: 0.5, metalness: 0.1 });
-
-    const stom = new THREE.Mesh(new THREE.SphereGeometry(1.2, 48, 48), baseMat);
-    stom.scale.set(1.2, 1.0, 0.9);
-    stom.rotation.z = 0.5;
-    partsRef.current.push({ mesh: stom, offset: new THREE.Vector3(0, 0, 0) });
+    const { scene } = useGLTF('/models/realistic_human_stomach.glb');
+    const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof stomachParts)[number] }>>([]);
+    const modelRef = useRef<THREE.Group | null>(null);
+    const [labelPositions, setLabelPositions] = useState<Map<string, [number, number, number]>>(new Map());
 
     useEffect(() => {
       if (!groupRef.current) return;
-      groupRef.current!.add(stom);
-    }, []);
+      groupRef.current!.clear();
 
-    useFrame((state) => {
+      if (!disassembled) {
+        if (scene && !modelRef.current) {
+          const clone = scene.clone();
+          clone.traverse((child: any) => {
+            if (child.isMesh) {
+              child.material = child.material.clone();
+              child.material.needsUpdate = true;
+            }
+          });
+
+          const box = new THREE.Box3().setFromObject(clone);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+
+          const positions: Map<string, [number, number, number]> = new Map();
+          stomachParts.forEach((part) => {
+            let x = center.x;
+            let y = center.y;
+            let z = center.z;
+
+            switch (part.id) {
+              case 'cardias': x = center.x - size.x * 0.4; y = center.y + size.y * 0.3; z = center.z; break;
+              case 'fundo-gastrico': x = center.x + size.x * 0.2; y = center.y + size.y * 0.4; z = center.z; break;
+              case 'corpo-gastrico': x = center.x; y = center.y; z = center.z; break;
+              case 'antro-piloro': x = center.x + size.x * 0.3; y = center.y - size.y * 0.2; z = center.z; break;
+              case 'piloro': x = center.x + size.x * 0.45; y = center.y - size.y * 0.3; z = center.z; break;
+              case 'menor-curvatura': x = center.x - size.x * 0.35; y = center.y - size.y * 0.1; z = center.z; break;
+              case 'maior-curvatura': x = center.x + size.x * 0.35; y = center.y + size.y * 0.1; z = center.z; break;
+              case 'mucosa-gastrica': x = center.x; y = center.y; z = center.z + size.z * 0.5; break;
+              case 'submucosa': x = center.x; y = center.y; z = center.z + size.z * 0.55; break;
+              case 'camada-muscular': x = center.x; y = center.y; z = center.z + size.z * 0.6; break;
+              case 'serosa': x = center.x; y = center.y; z = center.z + size.z * 0.65; break;
+            }
+            positions.set(part.id, [x, y, z]);
+          });
+          setLabelPositions(positions);
+
+          clone.scale.setScalar(1.2);
+          clone.position.set(0, 0, 0);
+          clone.updateMatrixWorld();
+          console.log('StomachMesh: GLTF carregado, children:', clone.children.length);
+          modelRef.current = clone;
+        }
+        if (modelRef.current) {
+          groupRef.current!.add(modelRef.current.clone());
+        }
+      } else {
+        if (partsRef.current.length === 0 && scene) {
+          scene.traverse((child: any) => {
+            if (child.isMesh) {
+              const mesh = child.clone();
+              mesh.material = child.material.clone();
+              mesh.material.needsUpdate = true;
+              mesh.position.set(0, 0, 0);
+              partsRef.current.push({ mesh, offset: new THREE.Vector3(0, 0, 0), part: stomachParts[0] });
+            }
+          });
+        }
+        partsRef.current.forEach(({ mesh }) => {
+          groupRef.current!.add(mesh);
+        });
+      }
+    }, [scene, disassembled]);
+
+    useFrame((state: any) => {
       if (!groupRef.current) return;
-      if (!disassembled) groupRef.current.rotation.y += 0.005;
-      partsRef.current.forEach(({ mesh, offset }) => {
-        mesh.position.lerp(new THREE.Vector3(offset.x * (disassembled ? 1 : 0), offset.y * (disassembled ? 1 : 0), offset.z * (disassembled ? 1 : 0)), 0.08);
-      });
+      if (!disassembled) {
+        groupRef.current.rotation.y += rotationSpeed;
+      } else {
+        partsRef.current.forEach(({ mesh, offset }) => {
+          mesh.position.lerp(new THREE.Vector3(offset.x * 2.5, offset.y * 2.5, offset.z * 2.5), 0.08);
+          mesh.rotation.y += 0.02;
+        });
+      }
     });
 
-    return <group ref={groupRef} />;
+    return (
+      <group ref={groupRef} dispose={null}>
+        <ambientLight intensity={1.5} />
+        <pointLight position={[0, 0, 4]} intensity={2} distance={20} />
+        <pointLight position={[4, 0, 0]} intensity={1} distance={15} />
+        <pointLight position={[-4, 0, 0]} intensity={1} distance={15} />
+        {!disassembled && selectedOrgan === 'stomach' && (
+          <>
+            {stomachParts.map((part) => {
+              const pos = labelPositions.get(part.id) ?? [0, 0, 0];
+              return (
+                <Html key={part.id} position={pos as [number, number, number]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-orange-300 border-orange-500/50 hover:bg-orange-500/20 hover:border-orange-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
+          </>
+        )}
+        {disassembled && selectedOrgan === 'stomach' && (
+          <>
+            {stomachParts.map((part) => {
+              let partMesh = partsRef.current.find((p) => p.part.id === part.id);
+              if (!partMesh) {
+                const colorMap: Record<string, number> = {
+                  cardias: 0xf97316,
+                  'fundo-gastrico': 0xfb923c,
+                  'corpo-gastrico': 0xfdba74,
+                  'antro-piloro': 0xfdba74,
+                  piloro: 0xf97316,
+                  'menor-curvatura': 0xfb923c,
+                  'maior-curvatura': 0xfb923c,
+                  'mucosa-gastrica': 0xfee2e2,
+                  submucosa: 0xfed7aa,
+                  'camada-muscular': 0xfdba74,
+                  serosa: 0xf97316,
+                };
+                const mesh = new THREE.Mesh(
+                  new THREE.SphereGeometry(0.25, 16, 16),
+                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xf97316, roughness: 0.4 })
+                );
+                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+                mesh.userData = { partId: part.id };
+                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
+                partsRef.current.push(partMesh);
+              }
+              return (
+                <Html key={part.id} position={[partMesh.mesh.position.x * 2.5, partMesh.mesh.position.y * 2.5, partMesh.mesh.position.z * 2.5]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-orange-300 border-orange-500/50 hover:bg-orange-500/20 hover:border-orange-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
+          </>
+        )}
+      </group>
+    );
   };
 
   const Organ3D: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
