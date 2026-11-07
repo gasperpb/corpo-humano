@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Stars, useGLTF, Html } from '@react-three/drei';
+import { GLTFLoader } from 'three-stdlib';
 import * as THREE from 'three';
 
 export default function App() {
@@ -155,71 +156,78 @@ export default function App() {
 
   const HeartMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
-    const { scene } = useGLTF('/models/realistic_human_heart/scene.gltf');
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
     const modelRef = useRef<THREE.Group | null>(null);
-    const [proceduralAdded, setProceduralAdded] = useState(false);
+    const [gltfScene, setGltfScene] = useState<THREE.Group | null>(null);
+    const proceduralAddedRef = useRef(false);
+    const loaderRef = useRef(new GLTFLoader());
 
     useEffect(() => {
       if (!groupRef.current) return;
-      console.log('HeartMesh useEffect: disassembled=', disassembled, 'scene=', !!scene, 'group children=', groupRef.current.children.length);
       groupRef.current!.clear();
 
       if (disassembled) {
         partsRef.current.forEach(({ mesh }) => {
           groupRef.current!.add(mesh);
         });
-      } else {
-        if (scene && !modelRef.current) {
-          const clone = scene.clone();
-          clone.traverse((child: any) => {
-            if (child.isMesh) {
-              child.material = child.material.clone();
-              child.material.needsUpdate = true;
-              child.material.emissive = new THREE.Color(0xef4444);
-              child.material.emissiveIntensity = 1.0;
-              child.material.side = THREE.DoubleSide;
-            }
-          });
-          clone.scale.setScalar(2.0);
-          clone.position.set(0, 0, 0);
-          clone.updateMatrixWorld();
-          console.log('HeartMesh: GLTF carregado, children:', clone.children.length);
-          modelRef.current = clone;
-        }
-        if (modelRef.current) {
-          groupRef.current!.add(modelRef.current.clone());
-        }
-
-        if (!proceduralAdded) {
-          const heartShape = new THREE.Shape();
-          const x = 0, y = 0;
-          heartShape.moveTo(x + 0.5, y + 0.5);
-          heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
-          heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
-          heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
-          heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
-          heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
-          heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
-          heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
-          heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
-
-          const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
-          const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
-          geometry.center();
-
-          const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
-          const mesh = new THREE.Mesh(geometry, material);
-          mesh.rotation.x = Math.PI / 2;
-          mesh.position.set(0, 0, 0);
-          mesh.scale.setScalar(1.2);
-          mesh.name = 'heart-procedural';
-          groupRef.current!.add(mesh);
-          setProceduralAdded(true);
-          console.log('HeartMesh: coração procedural adicionado');
-        }
+        return;
       }
-    }, [scene, disassembled, proceduralAdded]);
+
+      if (gltfScene && !modelRef.current) {
+        const clone = gltfScene.clone();
+        clone.traverse((child: any) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.needsUpdate = true;
+            child.material.emissive = new THREE.Color(0xef4444);
+            child.material.emissiveIntensity = 1.0;
+            child.material.side = THREE.DoubleSide;
+          }
+        });
+        clone.scale.setScalar(2.0);
+        clone.position.set(0, 0, 0);
+        clone.updateMatrixWorld();
+        modelRef.current = clone;
+      }
+      if (modelRef.current) {
+        groupRef.current!.add(modelRef.current.clone());
+      }
+
+      if (!proceduralAddedRef.current) {
+        const heartShape = new THREE.Shape();
+        const x = 0, y = 0;
+        heartShape.moveTo(x + 0.5, y + 0.5);
+        heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
+        heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
+        heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
+        heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
+        heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
+        heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
+        heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
+        heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
+
+        const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
+        const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+        geometry.center();
+
+        const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.x = Math.PI / 2;
+        mesh.position.set(0, 0, 0);
+        mesh.scale.setScalar(1.2);
+        mesh.name = 'heart-procedural';
+        groupRef.current!.add(mesh);
+        proceduralAddedRef.current = true;
+      }
+    }, [gltfScene, disassembled]);
+
+    useEffect(() => {
+      loaderRef.current.loadAsync('/models/realistic_human_heart.glb').then((gltf) => {
+        setGltfScene(gltf.scene);
+      }).catch((err) => {
+        console.warn('HeartMesh: falha ao carregar GLB, usando procedimental', err);
+      });
+    }, []);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
