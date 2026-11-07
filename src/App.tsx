@@ -113,6 +113,22 @@ export default function App() {
     { id: 'endocardio', name: 'Endocárdio', pos: [0, -0.6, 0.5], desc: 'Camada interna que reveste as cavidades cardíacas e as válvulas.' },
   ];
 
+  const lungParts = [
+    { id: 'pulmao-direito', name: 'Pulmão Direito', pos: [1.1, 0, 0], desc: 'Pulmão com 3 lobos (superior, médio e inferior). Recebe sangue desoxigenado da artéria pulmonar.' },
+    { id: 'pulmao-esquerdo', name: 'Pulmão Esquerdo', pos: [-1.1, 0, 0], desc: 'Pulmão com 2 lobos (superior e inferior). Possui incisura cardíaca para acomodar o coração.' },
+    { id: 'lobo-superior-direito', name: 'Lobo Superior Direito', pos: [1.4, 0.6, 0], desc: 'Porção superior do pulmão direito.' },
+    { id: 'lobo-medio-direito', name: 'Lobo Médio Direito', pos: [1.4, 0, 0], desc: 'Porção média do pulmão direito.' },
+    { id: 'lobo-inferior-direito', name: 'Lobo Inferior Direito', pos: [1.4, -0.6, 0], desc: 'Porção inferior do pulmão direito.' },
+    { id: 'lobo-superior-esquerdo', name: 'Lobo Superior Esquerdo', pos: [-1.4, 0.5, 0], desc: 'Porção superior do pulmão esquerdo.' },
+    { id: 'lobo-inferior-esquerdo', name: 'Lobo Inferior Esquerdo', pos: [-1.4, -0.5, 0], desc: 'Porção inferior do pulmão esquerdo.' },
+    { id: 'trachea', name: 'Traqueia', pos: [0, 1.5, 0], desc: 'Conduto que conduz o ar da laringe para os brônquios principais.' },
+    { id: 'bronquio-direito', name: 'Brônquio Direito', pos: [0.8, 0.5, 0], desc: 'Conduz ar para o pulmão direito. Mais curto, largo e vertical que o esquerdo.' },
+    { id: 'bronquio-esquerdo', name: 'Brônquio Esquerdo', pos: [-0.8, 0.5, 0], desc: 'Conduz ar para o pulmão esquerdo. Mais longo e estreito que o direito.' },
+    { id: 'alveolos', name: 'Alvéolos Pulmonares', pos: [0.5, -0.2, 0.3], desc: 'Pequenas estruturas onde ocorrem as trocas gasosas (oxigênio e dióxido de carbono).' },
+    { id: 'pleura', name: 'Pleura', pos: [1.6, 0, 0.2], desc: 'Membrana serosa que envolve os pulmões e reveste a cavidade torácica.' },
+    { id: 'diafragma', name: 'Diafragma', pos: [0, -1.4, 0], desc: 'Músculo principal da respiração, separa o tórax do abdômen.' },
+  ];
+
   const addNotification = (msg: string) => {
     const id = Date.now();
     setNotifications((prev) => [...prev, { id, msg }]);
@@ -250,38 +266,119 @@ export default function App() {
 
   const LungsMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
-    const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3 }>>([]);
-    const baseMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#3b82f6'), roughness: 0.5, metalness: 0.1 });
-    const trachMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.5 });
-
-    const rightLung = new THREE.Mesh(new THREE.SphereGeometry(1.1, 48, 48), baseMat);
-    rightLung.scale.set(0.8, 1.5, 0.9);
-    rightLung.position.set(1.1, 0, 0);
-    partsRef.current.push({ mesh: rightLung, offset: new THREE.Vector3(2.2, 0, 0) });
-
-    const leftLung = new THREE.Mesh(new THREE.SphereGeometry(1.1, 48, 48), baseMat);
-    leftLung.scale.set(0.8, 1.5, 0.9);
-    leftLung.position.set(-1.1, 0, 0);
-    partsRef.current.push({ mesh: leftLung, offset: new THREE.Vector3(-2.2, 0, 0) });
-
-    const trachea = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.6, 24), trachMat);
-    trachea.position.set(0, 1.5, 0);
-    partsRef.current.push({ mesh: trachea, offset: new THREE.Vector3(0, 2.7, 0) });
+    const { scene } = useGLTF('/models/realistic_human_lungs.glb');
+    const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof lungParts)[number] }>>([]);
 
     useEffect(() => {
-      if (!groupRef.current) return;
-      groupRef.current!.add(rightLung, leftLung, trachea);
-    }, []);
+      if (!groupRef.current || !scene) return;
 
-    useFrame((state) => {
+      if (!disassembled) {
+        const clone = scene.clone();
+        clone.traverse((child: any) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.needsUpdate = true;
+          }
+        });
+        clone.scale.setScalar(0.9);
+        clone.position.set(0, 0, 0);
+        groupRef.current!.add(clone);
+      } else {
+        partsRef.current.forEach(({ mesh }) => {
+          groupRef.current!.add(mesh);
+        });
+      }
+    }, [scene, disassembled]);
+
+    useFrame((state: any) => {
       if (!groupRef.current) return;
-      if (!disassembled) groupRef.current.rotation.y += 0.005;
-      partsRef.current.forEach(({ mesh, offset }) => {
-        mesh.position.lerp(new THREE.Vector3(offset.x * (disassembled ? 1 : 0), offset.y * (disassembled ? 1 : 0), offset.z * (disassembled ? 1 : 0)), 0.08);
-      });
+      if (!disassembled) {
+        groupRef.current.rotation.y += rotationSpeed * 100;
+      } else {
+        partsRef.current.forEach(({ mesh, offset, part }) => {
+          mesh.position.lerp(new THREE.Vector3(offset.x * 2.5, offset.y * 2.5, offset.z * 2.5), 0.08);
+          mesh.rotation.y += 0.02;
+        });
+      }
     });
 
-    return <group ref={groupRef} />;
+    return (
+      <group ref={groupRef} dispose={null}>
+        <pointLight position={[0, 0, 4]} intensity={1} distance={15} />
+        {!disassembled && selectedOrgan === 'lungs' && (
+          <>
+            {lungParts.map((part) => (
+              <Html key={part.id} position={part.pos as [number, number, number]}>
+                <div
+                  onClick={() => setSelectedHeartPart(part.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                    selectedHeartPart === part.id
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                      : 'bg-slate-900/90 text-blue-300 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-400'
+                  }`}
+                >
+                  {part.name}
+                </div>
+                {selectedHeartPart === part.id && (
+                  <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                    <p className="text-xs font-semibold text-blue-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                  </div>
+                )}
+              </Html>
+            ))}
+          </>
+        )}
+        {disassembled && selectedOrgan === 'lungs' && (
+          <>
+            {lungParts.map((part) => {
+              const colorMap: Record<string, number> = {
+                'pulmao-direito': 0x3b82f6,
+                'pulmao-esquerdo': 0x3b82f6,
+                'lobo-superior-direito': 0x60a5fa,
+                'lobo-medio-direito': 0x60a5fa,
+                'lobo-inferior-direito': 0x60a5fa,
+                'lobo-superior-esquerdo': 0x93c5fd,
+                'lobo-inferior-esquerdo': 0x93c5fd,
+                trachea: 0x93c5fd,
+                'bronquio-direito': 0xbfdbfe,
+                'bronquio-esquerdo': 0xbfdbfe,
+                alveolos: 0xdbEafe,
+                pleura: 0x94a3b8,
+                diafragma: 0x64748b,
+              };
+              const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.25, 16, 16),
+                new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0x3b82f6, roughness: 0.4 })
+              );
+              mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+              mesh.userData = { partId: part.id };
+              partsRef.current.push({ mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part });
+              return (
+                <Html key={part.id} position={[part.pos[0] * 2.5, part.pos[1] * 2.5, part.pos[2] * 2.5]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-blue-300 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-blue-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
+          </>
+        )}
+      </group>
+    );
   };
 
   const BrainMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
