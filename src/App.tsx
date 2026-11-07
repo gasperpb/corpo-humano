@@ -158,24 +158,14 @@ export default function App() {
     const { scene } = useGLTF('/models/realistic_human_heart/scene.gltf');
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
     const modelRef = useRef<THREE.Group | null>(null);
+    const [proceduralAdded, setProceduralAdded] = useState(false);
 
     useEffect(() => {
       if (!groupRef.current) return;
+      console.log('HeartMesh useEffect: disassembled=', disassembled, 'scene=', !!scene, 'group children=', groupRef.current.children.length);
       groupRef.current!.clear();
 
       if (disassembled) {
-        if (partsRef.current.length === 0 && scene) {
-          scene.traverse((child: any) => {
-            if (child.isMesh) {
-              const mesh = child.clone();
-              mesh.material = child.material.clone();
-              mesh.material.needsUpdate = true;
-              mesh.position.set(0, 0, 0);
-              mesh.userData = { partId: 'modelo-completo' };
-              partsRef.current.push({ mesh, offset: new THREE.Vector3(0, 0, 0), part: heartParts[0] });
-            }
-          });
-        }
         partsRef.current.forEach(({ mesh }) => {
           groupRef.current!.add(mesh);
         });
@@ -201,32 +191,35 @@ export default function App() {
           groupRef.current!.add(modelRef.current.clone());
         }
 
-        // Coração procedural garantido para visibilidade imediata
-        const heartShape = new THREE.Shape();
-        const x = 0, y = 0;
-        heartShape.moveTo(x + 0.5, y + 0.5);
-        heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
-        heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
-        heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
-        heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
-        heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
-        heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
-        heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
-        heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
+        if (!proceduralAdded) {
+          const heartShape = new THREE.Shape();
+          const x = 0, y = 0;
+          heartShape.moveTo(x + 0.5, y + 0.5);
+          heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
+          heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
+          heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
+          heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
+          heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
+          heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
+          heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
+          heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
 
-        const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
-        const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
-        geometry.center();
+          const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
+          const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+          geometry.center();
 
-        const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.rotation.x = Math.PI / 2;
-        mesh.position.set(0, 0, 0);
-        mesh.scale.setScalar(1.2);
-        mesh.name = 'heart-procedural';
-        groupRef.current!.add(mesh);
+          const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.rotation.x = Math.PI / 2;
+          mesh.position.set(0, 0, 0);
+          mesh.scale.setScalar(1.2);
+          mesh.name = 'heart-procedural';
+          groupRef.current!.add(mesh);
+          setProceduralAdded(true);
+          console.log('HeartMesh: coração procedural adicionado');
+        }
       }
-    }, [scene, disassembled]);
+    }, [scene, disassembled, proceduralAdded]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
@@ -298,6 +291,41 @@ export default function App() {
                   miocardio: 0xef4444,
                   endocardio: 0xfee2e2,
                 };
+                const mesh = new THREE.Mesh(
+                  new THREE.SphereGeometry(0.25, 16, 16),
+                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
+                );
+                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+                mesh.userData = { partId: part.id };
+                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
+                partsRef.current.push(partMesh);
+              }
+              return (
+                <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
+          </>
+        )}
+      </group>
+    );
+  };
                 const mesh = new THREE.Mesh(
                   new THREE.SphereGeometry(0.25, 16, 16),
                   new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
