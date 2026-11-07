@@ -270,6 +270,7 @@ export default function App() {
     const groupRef = useRef<THREE.Group>(null);
     const { scene } = useGLTF('/models/realistic_human_lungs.glb');
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof lungParts)[number] }>>([]);
+    const [labelPositions, setLabelPositions] = useState<Map<string, [number, number, number]>>(new Map());
 
     useEffect(() => {
       if (!groupRef.current || !scene) return;
@@ -282,6 +283,38 @@ export default function App() {
             child.material.needsUpdate = true;
           }
         });
+
+        // Calcular bounding box do modelo para posicionar labels corretamente
+        const box = new THREE.Box3().setFromObject(clone);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+
+        const positions: Map<string, [number, number, number]> = new Map();
+        lungParts.forEach((part) => {
+          // Posições relativas ao bounding box (porcentagens)
+          let x = center.x;
+          let y = center.y;
+          let z = center.z;
+
+          switch (part.id) {
+            case 'pulmao-direito': x = center.x + size.x * 0.35; y = center.y; z = center.z; break;
+            case 'pulmao-esquerdo': x = center.x - size.x * 0.35; y = center.y; z = center.z; break;
+            case 'lobo-superior-direito': x = center.x + size.x * 0.3; y = center.y + size.y * 0.3; z = center.z; break;
+            case 'lobo-medio-direito': x = center.x + size.x * 0.3; y = center.y; z = center.z + size.z * 0.1; break;
+            case 'lobo-inferior-direito': x = center.x + size.x * 0.3; y = center.y - size.y * 0.3; z = center.z; break;
+            case 'lobo-superior-esquerdo': x = center.x - size.x * 0.3; y = center.y + size.y * 0.3; z = center.z; break;
+            case 'lobo-inferior-esquerdo': x = center.x - size.x * 0.3; y = center.y - size.y * 0.3; z = center.z; break;
+            case 'trachea': x = center.x; y = center.y + size.y * 0.5; z = center.z - size.z * 0.2; break;
+            case 'bronquio-direito': x = center.x + size.x * 0.2; y = center.y + size.y * 0.2; z = center.z - size.z * 0.1; break;
+            case 'bronquio-esquerdo': x = center.x - size.x * 0.2; y = center.y + size.y * 0.2; z = center.z - size.z * 0.1; break;
+            case 'alveolos': x = center.x + size.x * 0.15; y = center.y - size.y * 0.1; z = center.z + size.z * 0.2; break;
+            case 'pleura': x = center.x + size.x * 0.5; y = center.y; z = center.z + size.z * 0.3; break;
+            case 'diafragma': x = center.x; y = center.y - size.y * 0.6; z = center.z; break;
+          }
+          positions.set(part.id, [x, y, z]);
+        });
+        setLabelPositions(positions);
+
         clone.scale.setScalar(0.9);
         clone.position.set(0, 0, 0);
         groupRef.current!.add(clone);
@@ -309,31 +342,35 @@ export default function App() {
         <pointLight position={[0, 0, 4]} intensity={1} distance={15} />
         {!disassembled && selectedOrgan === 'lungs' && (
           <>
-            {lungParts.map((part) => (
-              <Html key={part.id} position={part.pos as [number, number, number]}>
-                <div
-                  onClick={() => setSelectedHeartPart(part.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
-                    selectedHeartPart === part.id
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
-                      : 'bg-slate-900/90 text-blue-300 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-400'
-                  }`}
-                >
-                  {part.name}
-                </div>
-                {selectedHeartPart === part.id && (
-                  <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
-                    <p className="text-xs font-semibold text-blue-400 mb-1 uppercase tracking-wider">{part.name}</p>
-                    <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+            {lungParts.map((part) => {
+              const pos = labelPositions.get(part.id) ?? [0, 0, 0];
+              return (
+                <Html key={part.id} position={pos as [number, number, number]}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-blue-300 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-400'
+                    }`}
+                  >
+                    {part.name}
                   </div>
-                )}
-              </Html>
-            ))}
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-blue-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              );
+            })}
           </>
         )}
         {disassembled && selectedOrgan === 'lungs' && (
           <>
             {lungParts.map((part) => {
+              const pos = labelPositions.get(part.id) ?? [0, 0, 0];
               const colorMap: Record<string, number> = {
                 'pulmao-direito': 0x3b82f6,
                 'pulmao-esquerdo': 0x3b82f6,
@@ -353,11 +390,11 @@ export default function App() {
                 new THREE.SphereGeometry(0.25, 16, 16),
                 new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0x3b82f6, roughness: 0.4 })
               );
-              mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+              mesh.position.set(pos[0], pos[1], pos[2]);
               mesh.userData = { partId: part.id };
-              partsRef.current.push({ mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part });
+              partsRef.current.push({ mesh, offset: new THREE.Vector3(pos[0], pos[1], pos[2]), part });
               return (
-                <Html key={part.id} position={[part.pos[0] * 2.5, part.pos[1] * 2.5, part.pos[2] * 2.5]}>
+                <Html key={part.id} position={[pos[0] * 2.5, pos[1] * 2.5, pos[2] * 2.5]}>
                   <div
                     onClick={() => setSelectedHeartPart(part.id)}
                     className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
