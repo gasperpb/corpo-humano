@@ -731,7 +731,7 @@ export default function App() {
   const CirculatoryMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
     const partsRef = useRef<Array<{ mesh: THREE.Mesh | THREE.Line; offset: THREE.Vector3; id: string; name: string }>>([]);
-    const { scene, nodes } = useGLTF('/models/human-circulatory.glb');
+    const { scene, nodes } = useGLTF('/models/circulatory-system-figure.glb');
     const [hasModel, setHasModel] = useState(false);
 
     useEffect(() => {
