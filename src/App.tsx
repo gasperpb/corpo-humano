@@ -13,6 +13,45 @@ export default function App() {
   const [bodyTemp, setBodyTemp] = useState(36.6);
   const [oxygenLevel, setOxygenLevel] = useState(98);
   const [notifications, setNotifications] = useState<Array<{ id: number; msg: string }>>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const clickStart = useRef<{ x: number; y: number; moved: boolean }>({ x: 0, y: 0, moved: false });
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(document.fullscreenElement === viewportRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const el = viewportRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      el.requestFullscreen?.().catch(() => addNotification('Tela cheia não suportada neste navegador'));
+    }
+  };
+
+  const onViewportPointerDown = (e: React.PointerEvent) => {
+    clickStart.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+
+  const onViewportPointerMove = (e: React.PointerEvent) => {
+    if (clickStart.current.moved) return;
+    if (Math.abs(e.clientX - clickStart.current.x) > 6 || Math.abs(e.clientY - clickStart.current.y) > 6) {
+      clickStart.current.moved = true;
+    }
+  };
+
+  const onViewportClick = (e: React.MouseEvent) => {
+    if (clickStart.current.moved) {
+      clickStart.current.moved = false;
+      return;
+    }
+    if ((e.target as HTMLElement).tagName !== 'CANVAS') return;
+    toggleFullscreen();
+  };
 
   const organsData = {
     heart: {
@@ -1129,7 +1168,13 @@ export default function App() {
 
         {/* Right Column: 3D Viewport */}
         <div className="flex-1 flex flex-col gap-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl relative overflow-hidden w-full h-[55vh] min-h-[380px] max-h-[620px] lg:h-auto lg:max-h-none lg:min-h-[500px] lg:flex-1">
+          <div
+            ref={viewportRef}
+            className="viewport-3d bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl relative overflow-hidden w-full h-[55vh] min-h-[380px] max-h-[620px] lg:h-auto lg:max-h-none lg:min-h-[500px] lg:flex-1"
+            onPointerDown={onViewportPointerDown}
+            onPointerMove={onViewportPointerMove}
+            onClick={onViewportClick}
+          >
             <div className="absolute top-4 left-4 right-4 z-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pointer-events-none">
               <div className="bg-slate-950/80 backdrop-blur-md border border-slate-800/80 px-4 py-2 rounded-xl flex items-center gap-3 pointer-events-auto shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1155,6 +1200,22 @@ export default function App() {
                     </svg>
                   )}
                   {disassembled ? 'Montar Órgão' : 'Desmontar (Teardown)'}
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                  aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-lg transition-all flex items-center justify-center"
+                >
+                  {isFullscreen ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9H4m5 0V4m6 5h5m-5 0V4M9 15H4m5 0v5m6-5h5m-5 0v5"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5m11-5v5h-5"></path>
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

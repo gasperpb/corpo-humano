@@ -5,3 +5,18 @@
 body {
   margin: 0;
 }
+
+.viewport-3d:fullscreen {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 100vh;
+  border-radius: 0;
+  border-width: 0;
+  background-color: #020617;
+}
+
+.viewport-3d:fullscreen canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
