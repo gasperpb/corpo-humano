@@ -157,25 +157,54 @@ export default function App() {
     const groupRef = useRef<THREE.Group>(null);
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
     const { scene } = useGLTF('/models/realistic_human_heart.glb');
+    const [heartFragments, setHeartFragments] = useState<THREE.Group[]>([]);
 
     useEffect(() => {
       if (!groupRef.current) return;
 
       if (disassembled) {
+        groupRef.current.clear();
+        if (scene && heartFragments.length === 0) {
+          const source = scene.clone(true);
+          source.scale.setScalar(2);
+          source.updateMatrixWorld(true);
+          const bounds = new THREE.Box3().setFromObject(source);
+          const width = bounds.max.x - bounds.min.x;
+          const offsets = [-width * 0.75, -width * 0.25, width * 0.25, width * 0.75];
+          const fragments = offsets.map((offset, index) => {
+            const minX = bounds.min.x + (width / 4) * index;
+            const maxX = minX + width / 4;
+            const fragment = scene.clone(true);
+            fragment.scale.setScalar(2);
+            fragment.position.x = offset;
+            fragment.name = `heart-fragment-${index}`;
+            fragment.traverse((child: any) => {
+              if (!child.isMesh) return;
+              child.material = child.material.clone();
+              child.material.clippingPlanes = [
+                new THREE.Plane(new THREE.Vector3(1, 0, 0), -(minX + offset)),
+                new THREE.Plane(new THREE.Vector3(-1, 0, 0), maxX + offset),
+              ];
+              child.material.clipIntersection = false;
+              child.material.needsUpdate = true;
+            });
+            return fragment;
+          });
+          setHeartFragments(fragments);
+          fragments.forEach((fragment) => groupRef.current?.add(fragment));
+        } else {
+          heartFragments.forEach((fragment) => groupRef.current?.add(fragment));
+        }
         const existingParts = groupRef.current!.children.filter(c => c.name === 'heart-part');
         if (existingParts.length === partsRef.current.length && existingParts.length > 0) return;
-        groupRef.current!.clear();
-        partsRef.current.forEach(({ mesh }) => {
-          mesh.name = 'heart-part';
-          groupRef.current!.add(mesh);
-        });
         return;
       }
 
+      if (heartFragments.length > 0) setHeartFragments([]);
       groupRef.current!.children.forEach((c: any) => {
-        if (c.name === 'heart-part') groupRef.current!.remove(c);
+        if (c.name.startsWith('heart-fragment')) groupRef.current!.remove(c);
       });
-    }, [scene, disassembled]);
+    }, [scene, disassembled, heartFragments]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
@@ -188,9 +217,8 @@ export default function App() {
           groupRef.current.scale.set(1, 1, 1);
         }
       } else {
-        partsRef.current.forEach(({ mesh, offset, part }) => {
-          mesh.position.lerp(new THREE.Vector3(offset.x * 3, offset.y * 3, offset.z * 3), 0.08);
-          mesh.rotation.y += 0.02;
+        heartFragments.forEach((fragment) => {
+          fragment.rotation.y += 0.003;
         });
       }
     });
@@ -230,36 +258,8 @@ export default function App() {
           {disassembled && selectedOrgan === 'heart' && (
             <>
               {heartParts.map((part) => {
-                let partMesh = partsRef.current.find((p) => p.part.id === part.id);
-                if (!partMesh) {
-                  const colorMap: Record<string, number> = {
-                    'atrio-direito': 0xef4444,
-                    'atrio-esquerdo': 0xdc2626,
-                    'ventriculo-direito': 0xb91c1c,
-                    'ventriculo-esquerdo': 0x991b1b,
-                    'valvula-tricuspide': 0xf97316,
-                    'valvula-mitral': 0xf97316,
-                    'valvula-pulmonar': 0xef4444,
-                    'valvula-aortica': 0xef4444,
-                    aorta: 0xb91c1c,
-                    'veia-cava-superior': 0x7f1d1d,
-                    'veia-cava-inferior': 0x7f1d1d,
-                    'arteria-pulmonar': 0xb91c1c,
-                    pericardio: 0x6b7280,
-                    miocardio: 0xef4444,
-                    endocardio: 0xfee2e2,
-                  };
-                  const mesh = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.25, 16, 16),
-                    new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
-                  );
-                  mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-                  mesh.userData = { partId: part.id };
-                  partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
-                  partsRef.current.push(partMesh);
-                }
                 return (
-                  <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
+                  <Html key={part.id} position={[part.pos[0] * 3, part.pos[1] * 3, part.pos[2] * 3]}>
                     <div
                       onClick={() => setSelectedHeartPart(part.id)}
                       className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
@@ -669,14 +669,11 @@ export default function App() {
                   'camada-muscular': 0xfdba74,
                   serosa: 0xf97316,
                 };
-                const mesh = new THREE.Mesh(
-                  new THREE.SphereGeometry(0.25, 16, 16),
-                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xf97316, roughness: 0.4 })
-                );
-                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-                mesh.userData = { partId: part.id };
-                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
-                partsRef.current.push(partMesh);
+                partMesh = {
+                  mesh: new THREE.Mesh(),
+                  offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]),
+                  part,
+                };
               }
               return (
                 <Html key={part.id} position={[partMesh.mesh.position.x * 2.5, partMesh.mesh.position.y * 2.5, partMesh.mesh.position.z * 2.5]}>
@@ -870,7 +867,7 @@ export default function App() {
               <Canvas
                 camera={{ position: [0, 0, 7], fov: 50 }}
                 shadows
-                gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+                gl={{ antialias: true, alpha: true, localClippingEnabled: true, powerPreference: 'high-performance' }}
                 style={{ width: '100%', height: '100%', display: 'block' }}
               >
                 <ambientLight intensity={1.2} />
