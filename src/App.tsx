@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Stars, useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -715,178 +715,139 @@ export default function App() {
     );
   };
 
-  // ---------------- Circulatory System (real .glb model with procedural fallback) ----------------
+  // ---------------- Circulatory System (real .glb model) ----------------
 
-  const circulatoryParts = [
-    { id: 'heart', name: 'Coração', pos: [0, 0.2, 0] },
-    { id: 'aorta', name: 'Aorta', pos: [0.8, 1.4, 0.2] },
-    { id: 'pulmonary-artery', name: 'Artéria Pulmonar', pos: [-1.0, 0.7, 0.3] },
-    { id: 'vena-cava-superior', name: 'Veia Cava Superior', pos: [-0.4, 1.2, -0.3] },
-    { id: 'vena-cava-inferior', name: 'Veia Cava Inferior', pos: [-0.2, -0.7, -0.3] },
-    { id: 'peripheral-artery', name: 'Artéria Periférica', pos: [2.2, 1.4, 0.4] },
-    { id: 'peripheral-vein', name: 'Veia Periférica', pos: [-2.2, 1.4, 0.4] },
-    { id: 'capillaries', name: 'Capilares', pos: [2.4, 1.5, 0.5] },
+  const circulatoryLabels: Array<{ node: string; name: string }> = [
+    { node: 'Ascending aorta leftward arch descending aorta', name: 'Aorta' },
+    { node: 'Superior vena cava returning to right atrium', name: 'Veia Cava Superior' },
+    { node: 'Inferior vena cava returning to right atrium', name: 'Veia Cava Inferior' },
+    { node: 'Pulmonary trunk from right ventricle', name: 'Tronco Pulmonar' },
+    { node: 'Left pulmonary artery oxygen-poor', name: 'Artéria Pulmonar Esq.' },
+    { node: 'Right pulmonary artery oxygen-poor', name: 'Artéria Pulmonar Dir.' },
+    { node: 'Left superior pulmonary vein oxygen-rich', name: 'Veia Pulmonar Esq.' },
+    { node: 'Right superior pulmonary vein oxygen-rich', name: 'Veia Pulmonar Dir.' },
+    { node: 'Left atrium posterior body', name: 'Átrio Esquerdo' },
+    { node: 'Right atrium and auricular outline', name: 'Átrio Direito' },
+    { node: 'Left ventricle tapering to leftward apex', name: 'Ventrículo Esquerdo' },
+    { node: 'Right ventricle anterior crescent', name: 'Ventrículo Direito' },
+    { node: 'Brachiocephalic arterial trunk', name: 'Tronco Braquiocefálico' },
+    { node: 'Left common carotid origin', name: 'Artéria Carótida Comum' },
+    { node: 'Left internal jugular vein', name: 'Veia Jugular Interna' },
+    { node: 'Left subclavian axillary brachial artery', name: 'Artéria Braquial' },
+    { node: 'Left radial artery', name: 'Artéria Radial' },
+    { node: 'Left ulnar artery', name: 'Artéria Ulnar' },
+    { node: 'Left common external iliac femoral artery', name: 'Artéria Femoral' },
+    { node: 'Left great saphenous superficial venous route', name: 'Veia Safena Magna' },
+    { node: 'Coeliac arterial trunk and hepatic route', name: 'Tronco Celíaco' },
+    { node: 'Superior mesenteric arterial route', name: 'Artéria Mesentérica' },
+    { node: 'Left renal arterial branch', name: 'Artéria Renal' },
+    { node: 'Left renal venous branch', name: 'Veia Renal' },
+    { node: 'Left anterior interventricular coronary artery', name: 'Artéria Coronária Esq.' },
+    { node: 'Right coronary artery around ventricular surface', name: 'Artéria Coronária Dir.' },
+    { node: 'Left anterior tibial and dorsalis pedis artery', name: 'Artéria Tibial Anterior' },
   ];
 
   const CirculatoryMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
-    const groupRef = useRef<THREE.Group>(null);
-    const partsRef = useRef<Array<{ mesh: THREE.Mesh | THREE.Line; offset: THREE.Vector3; id: string; name: string }>>([]);
-    const { scene, nodes } = useGLTF('/models/circulatory-system-figure.glb');
+    const wrapperRef = useRef<THREE.Group>(null);
+    const labelRefs = useRef<Array<THREE.Group | null>>([]);
+    const { scene } = useGLTF('/models/circulatory-system-figure.glb');
 
-    useEffect(() => {
-      if (!groupRef.current) return;
+    const MODEL_SCALE = 2;
+    const EXPLODE_DIST = 0.45;
 
-      // Limpar grupo e resetar partes antes de carregar
-      while (groupRef.current!.children.length > 0) {
-        groupRef.current!.remove(groupRef.current!.children[0]);
+    const { model, offset, parts, movers } = useMemo(() => {
+      if (!scene) {
+        return {
+          model: null as THREE.Object3D | null,
+          offset: new THREE.Vector3(),
+          parts: [] as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>,
+          movers: [] as Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }>,
+        };
       }
-      partsRef.current = [];
 
-      const buildProcedural = () => {
-        const heartMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4, metalness: 0.1 });
-        const vesselMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
-        const veinMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+      const clone = scene.clone(true);
+      clone.traverse((child: any) => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.needsUpdate = true;
+        }
+      });
+      clone.updateMatrixWorld(true);
 
-        const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 2), heartMat);
-        heart.scale.set(1, 1.2, 0.9);
-        heart.position.set(0, 0.2, 0);
-        heart.userData = { id: 'heart', name: 'Coração' };
-        groupRef.current.add(heart);
-        partsRef.current.push({ mesh: heart, offset: new THREE.Vector3(0, 0, 0), id: 'heart', name: 'Coração' });
+      const box = new THREE.Box3().setFromObject(clone);
+      const center = box.getCenter(new THREE.Vector3());
 
-        const aortaCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, 0.9, 0),
-          new THREE.Vector3(0, 1.6, 0),
-          new THREE.Vector3(0.6, 1.9, 0.2),
-          new THREE.Vector3(1.1, 1.6, 0.4),
-        ]);
-        const aorta = new THREE.Mesh(new THREE.TubeGeometry(aortaCurve, 20, 0.18, 8, false), vesselMat);
-        aorta.userData = { id: 'aorta', name: 'Aorta' };
-        groupRef.current.add(aorta);
-        partsRef.current.push({ mesh: aorta, offset: new THREE.Vector3(0.8, 1.4, 0.2), id: 'aorta', name: 'Aorta' });
+      const movers: Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }> = [];
+      clone.traverse((o: any) => {
+        if (!o.isMesh) return;
+        const mb = new THREE.Box3().setFromObject(o);
+        const mc = mb.getCenter(new THREE.Vector3());
+        const dir = mc.clone().sub(center);
+        if (dir.lengthSq() < 1e-6) dir.set(0, 0, 0);
+        else dir.normalize();
+        movers.push({ mesh: o, dir });
+      });
 
-        const pulmCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(-0.4, 0.5, 0.2),
-          new THREE.Vector3(-1.0, 0.8, 0.4),
-          new THREE.Vector3(-1.4, 0.5, 0.2),
-        ]);
-        const pulm = new THREE.Mesh(new THREE.TubeGeometry(pulmCurve, 15, 0.14, 8, false), vesselMat);
-        pulm.userData = { id: 'pulmonary-artery', name: 'Artéria Pulmonar' };
-        groupRef.current.add(pulm);
-        partsRef.current.push({ mesh: pulm, offset: new THREE.Vector3(-1.0, 0.7, 0.3), id: 'pulmonary-artery', name: 'Artéria Pulmonar' });
+      const parts = circulatoryLabels
+        .map(({ node, name }) => {
+          const mesh = clone.getObjectByName(node);
+          if (!mesh) return null;
+          const mb = new THREE.Box3().setFromObject(mesh);
+          const mc = mb.getCenter(new THREE.Vector3());
+          return { id: node, name, mesh, center: mc };
+        })
+        .filter(Boolean) as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>;
 
-        const vcsCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(-0.5, 1.5, -0.4),
-          new THREE.Vector3(-0.2, 0.9, -0.2),
-        ]);
-        const vcs = new THREE.Mesh(new THREE.TubeGeometry(vcsCurve, 12, 0.16, 6, false), veinMat);
-        vcs.userData = { id: 'vena-cava-superior', name: 'Veia Cava Superior' };
-        groupRef.current.add(vcs);
-        partsRef.current.push({ mesh: vcs, offset: new THREE.Vector3(-0.4, 1.2, -0.3), id: 'vena-cava-superior', name: 'Veia Cava Superior' });
-
-        const vciCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(-0.3, -1.1, -0.4),
-          new THREE.Vector3(-0.1, -0.3, -0.2),
-        ]);
-        const vci = new THREE.Mesh(new THREE.TubeGeometry(vciCurve, 12, 0.16, 6, false), veinMat);
-        vci.userData = { id: 'vena-cava-inferior', name: 'Veia Cava Inferior' };
-        groupRef.current.add(vci);
-        partsRef.current.push({ mesh: vci, offset: new THREE.Vector3(-0.2, -0.7, -0.3), id: 'vena-cava-inferior', name: 'Veia Cava Inferior' });
-
-        const peripheral = [
-          { start: [1.2, 0.8, 0], end: [2.2, 1.4, 0.4], color: vesselMat, id: 'peripheral-artery', name: 'Artéria Periférica' },
-          { start: [1.2, -0.8, 0], end: [2.2, -1.4, 0.4], color: vesselMat, id: 'peripheral-artery-2', name: 'Artéria Periférica' },
-          { start: [-1.2, 0.8, 0], end: [-2.2, 1.4, 0.4], color: veinMat, id: 'peripheral-vein', name: 'Veia Periférica' },
-          { start: [-1.2, -0.8, 0], end: [-2.2, -1.4, 0.4], color: veinMat, id: 'peripheral-vein-2', name: 'Veia Periférica' },
-        ];
-        peripheral.forEach((p, i) => {
-          const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(...p.start),
-            new THREE.Vector3((p.start[0] + p.end[0]) / 2, (p.start[1] + p.end[1]) / 2 + 0.3, (p.start[2] + p.end[2]) / 2),
-            new THREE.Vector3(...p.end),
-          ]);
-          const tube = new THREE.TubeGeometry(curve, 10, 0.09, 6, false);
-          const mesh = new THREE.Mesh(tube, p.color);
-          mesh.userData = { id: p.id, name: p.name };
-          groupRef.current.add(mesh);
-          partsRef.current.push({ mesh, offset: new THREE.Vector3(...p.end), id: p.id, name: p.name });
-        });
-
-        const capPositions = [
-          [2.4, 1.5, 0.5], [2.4, -1.5, 0.5], [-2.4, 1.5, 0.5], [-2.4, -1.5, 0.5],
-          [0, 2.2, 0], [0, -2.2, 0],
-        ];
-        capPositions.forEach((pos, i) => {
-          const cap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-          cap.position.set(...pos);
-          cap.userData = { id: `capillary-${i}`, name: 'Capilares' };
-          groupRef.current.add(cap);
-          partsRef.current.push({ mesh: cap, offset: new THREE.Vector3(...pos), id: `capillary-${i}`, name: 'Capilares' });
-        });
+      return {
+        model: clone,
+        offset: new THREE.Vector3(-center.x * MODEL_SCALE, -center.y * MODEL_SCALE, -center.z * MODEL_SCALE),
+        parts,
+        movers,
       };
-
-      if (scene) {
-        // Modelo real carregado
-        const clone = scene.clone(true);
-        clone.traverse((child: any) => {
-          if (child.isMesh) {
-            child.material = child.material.clone();
-            child.material.needsUpdate = true;
-          }
-        });
-        clone.position.set(0, 0, 0);
-        clone.scale.setScalar(1.2);
-        groupRef.current!.add(clone);
-
-        circulatoryParts.forEach((part) => {
-          const node = nodes[part.id] as THREE.Object3D | undefined;
-          const offset = node ? new THREE.Vector3(node.position.x, node.position.y, node.position.z) : new THREE.Vector3(...part.pos);
-          const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
-          mesh.position.copy(offset);
-          mesh.userData = { id: part.id, name: part.name };
-          partsRef.current.push({ mesh, offset, id: part.id, name: part.name });
-          groupRef.current!.add(mesh);
-        });
-      } else {
-        buildProcedural();
-      }
-
-      if (disassembled) {
-        partsRef.current.forEach(({ mesh, offset }) => {
-          mesh.position.lerp(offset, 0.05);
-        });
-      }
-    }, [scene, nodes, disassembled]);
+    }, [scene, MODEL_SCALE]);
 
     useFrame((state) => {
-      if (!groupRef.current) return;
+      if (!wrapperRef.current) return;
       if (!disassembled) {
-        groupRef.current.rotation.y += 0.003;
-      } else {
-        partsRef.current.forEach(({ mesh, offset }) => {
-          mesh.position.lerp(offset, 0.05);
-        });
+        wrapperRef.current.rotation.y += 0.003;
       }
+      const target = new THREE.Vector3();
+      movers.forEach(({ mesh, dir }) => {
+        if (disassembled) target.copy(dir).multiplyScalar(EXPLODE_DIST);
+        else target.set(0, 0, 0);
+        mesh.position.lerp(target, 0.08);
+      });
+      parts.forEach((part, i) => {
+        const g = labelRefs.current[i];
+        if (g) g.position.copy(part.center).add(part.mesh.position);
+      });
     });
 
     return (
-      <group ref={groupRef} dispose={null}>
+      <group dispose={null}>
         <ambientLight intensity={1.2} />
         <pointLight position={[0, 0, 5]} intensity={2} />
-        {selectedOrgan === 'circulatory' && !disassembled && (
-          <>
-            {partsRef.current.map((part) => (
-              <Html key={part.id} position={[part.offset.x, part.offset.y, part.offset.z]}>
-                <div
-                  onClick={() => addNotification(`Selecionado: ${part.name}`)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400`}
-                >
-                  {part.name}
-                </div>
-              </Html>
+        <group ref={wrapperRef} dispose={null}>
+          <group scale={MODEL_SCALE} position={[offset.x, offset.y, offset.z]}>
+            {model && <primitive object={model} />}
+            {parts.map((part, i) => (
+              <group
+                key={part.id}
+                ref={(el) => { labelRefs.current[i] = el; }}
+                position={[part.center.x, part.center.y, part.center.z]}
+              >
+                <Html position={[0, 0, 0]}>
+                  <div
+                    onClick={() => addNotification(`Selecionado: ${part.name}`)}
+                    className="px-2 py-1 rounded-md text-[10px] font-bold shadow-lg border cursor-pointer whitespace-nowrap bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all"
+                  >
+                    {part.name}
+                  </div>
+                </Html>
+              </group>
             ))}
-          </>
-        )}
+          </group>
+        </group>
       </group>
     );
   };
