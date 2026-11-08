@@ -715,126 +715,142 @@ export default function App() {
     );
   };
 
-  // ---------------- Circulatory System (procedural geometry) ----------------
+  // ---------------- Circulatory System (real .glb model with procedural fallback) ----------------
+
+  const circulatoryParts = [
+    { id: 'heart', name: 'Coração', pos: [0, 0.2, 0] },
+    { id: 'aorta', name: 'Aorta', pos: [0.8, 1.4, 0.2] },
+    { id: 'pulmonary-artery', name: 'Artéria Pulmonar', pos: [-1.0, 0.7, 0.3] },
+    { id: 'vena-cava-superior', name: 'Veia Cava Superior', pos: [-0.4, 1.2, -0.3] },
+    { id: 'vena-cava-inferior', name: 'Veia Cava Inferior', pos: [-0.2, -0.7, -0.3] },
+    { id: 'peripheral-artery', name: 'Artéria Periférica', pos: [2.2, 1.4, 0.4] },
+    { id: 'peripheral-vein', name: 'Veia Periférica', pos: [-2.2, 1.4, 0.4] },
+    { id: 'capillaries', name: 'Capilares', pos: [2.4, 1.5, 0.5] },
+  ];
 
   const CirculatoryMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
     const partsRef = useRef<Array<{ mesh: THREE.Mesh | THREE.Line; offset: THREE.Vector3; id: string; name: string }>>([]);
-
-    const heartMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4, metalness: 0.1 });
-    const vesselMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
-    const veinMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+    const { scene, nodes } = useGLTF('/models/human-circulatory.glb');
+    const [hasModel, setHasModel] = useState(false);
 
     useEffect(() => {
       if (!groupRef.current) return;
 
-      // Coração (base)
-      const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 2), heartMat);
-      heart.scale.set(1, 1.2, 0.9);
-      heart.position.set(0, 0.2, 0);
-      heart.userData = { id: 'heart', name: 'Coração' };
-      groupRef.current.add(heart);
-      partsRef.current.push({ mesh: heart, offset: new THREE.Vector3(0, 0, 0), id: 'heart', name: 'Coração' });
+      if (scene && !hasModel) {
+        // Modelo real carregado
+        const clone = scene.clone(true);
+        clone.traverse((child: any) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.needsUpdate = true;
+          }
+        });
+        clone.position.set(0, 0, 0);
+        clone.scale.setScalar(1.2);
+        groupRef.current!.add(clone);
+        setHasModel(true);
 
-      // Aorta (tubo curvado saindo do topo do coração)
-      const aortaCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 0.9, 0),
-        new THREE.Vector3(0, 1.6, 0),
-        new THREE.Vector3(0.6, 1.9, 0.2),
-        new THREE.Vector3(1.1, 1.6, 0.4),
-      ]);
-      const aortaTube = new THREE.TubeGeometry(aortaCurve, 20, 0.18, 8, false);
-      const aorta = new THREE.Mesh(aortaTube, vesselMat);
-      aorta.userData = { id: 'aorta', name: 'Aorta' };
-      groupRef.current.add(aorta);
-      partsRef.current.push({ mesh: aorta, offset: new THREE.Vector3(0.8, 1.4, 0.2), id: 'aorta', name: 'Aorta' });
+        // Criar partsRef com base nos nós do modelo, fallback para positions padrão
+        circulatoryParts.forEach((part) => {
+          const node = nodes[part.id] as THREE.Object3D | undefined;
+          const offset = node ? new THREE.Vector3(node.position.x, node.position.y, node.position.z) : new THREE.Vector3(...part.pos);
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
+          mesh.position.copy(offset);
+          mesh.userData = { id: part.id, name: part.name };
+          partsRef.current.push({ mesh, offset, id: part.id, name: part.name });
+          groupRef.current!.add(mesh);
+        });
+      } else {
+        // Fallback procedural se o modelo não existir
+        const heartMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4, metalness: 0.1 });
+        const vesselMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
+        const veinMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
 
-      // Artéria pulmonar (saída do ventrículo direito)
-      const pulmCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-0.4, 0.5, 0.2),
-        new THREE.Vector3(-1.0, 0.8, 0.4),
-        new THREE.Vector3(-1.4, 0.5, 0.2),
-      ]);
-      const pulmTube = new THREE.TubeGeometry(pulmCurve, 15, 0.14, 8, false);
-      const pulm = new THREE.Mesh(pulmTube, vesselMat);
-      pulm.userData = { id: 'pulmonary-artery', name: 'Artéria Pulmonar' };
-      groupRef.current.add(pulm);
-      partsRef.current.push({ mesh: pulm, offset: new THREE.Vector3(-1.0, 0.7, 0.3), id: 'pulmonary-artery', name: 'Artéria Pulmonar' });
+        const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 2), heartMat);
+        heart.scale.set(1, 1.2, 0.9);
+        heart.position.set(0, 0.2, 0);
+        heart.userData = { id: 'heart', name: 'Coração' };
+        groupRef.current.add(heart);
+        partsRef.current.push({ mesh: heart, offset: new THREE.Vector3(0, 0, 0), id: 'heart', name: 'Coração' });
 
-      // Veia cava superior (entrada no topo do coração)
-      const vcsCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-0.5, 1.5, -0.4),
-        new THREE.Vector3(-0.2, 0.9, -0.2),
-      ]);
-      const vcsTube = new THREE.TubeGeometry(vcsCurve, 12, 0.16, 6, false);
-      const vcs = new THREE.Mesh(vcsTube, veinMat);
-      vcs.userData = { id: 'vena-cava-superior', name: 'Veia Cava Superior' };
-      groupRef.current.add(vcs);
-      partsRef.current.push({ mesh: vcs, offset: new THREE.Vector3(-0.4, 1.2, -0.3), id: 'vena-cava-superior', name: 'Veia Cava Superior' });
-
-      // Veia cava inferior (entrada na base do coração)
-      const vciCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-0.3, -1.1, -0.4),
-        new THREE.Vector3(-0.1, -0.3, -0.2),
-      ]);
-      const vciTube = new THREE.TubeGeometry(vciCurve, 12, 0.16, 6, false);
-      const vci = new THREE.Mesh(vciTube, veinMat);
-      vci.userData = { id: 'vena-cava-inferior', name: 'Veia Cava Inferior' };
-      groupRef.current.add(vci);
-      partsRef.current.push({ mesh: vci, offset: new THREE.Vector3(-0.2, -0.7, -0.3), id: 'vena-cava-inferior', name: 'Veia Cava Inferior' });
-
-      // Vasos periféricos simplificados (representando artérias e veias pelos membros)
-      const peripheral = [
-        { start: [1.2, 0.8, 0], end: [2.2, 1.4, 0.4], color: vesselMat },
-        { start: [1.2, -0.8, 0], end: [2.2, -1.4, 0.4], color: vesselMat },
-        { start: [-1.2, 0.8, 0], end: [-2.2, 1.4, 0.4], color: veinMat },
-        { start: [-1.2, -0.8, 0], end: [-2.2, -1.4, 0.4], color: veinMat },
-      ];
-      peripheral.forEach((p, i) => {
-        const curve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(...p.start),
-          new THREE.Vector3((p.start[0] + p.end[0]) / 2, (p.start[1] + p.end[1]) / 2 + 0.3, (p.start[2] + p.end[2]) / 2),
-          new THREE.Vector3(...p.end),
+        const aortaCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0.9, 0),
+          new THREE.Vector3(0, 1.6, 0),
+          new THREE.Vector3(0.6, 1.9, 0.2),
+          new THREE.Vector3(1.1, 1.6, 0.4),
         ]);
-        const tube = new THREE.TubeGeometry(curve, 10, 0.09, 6, false);
-        const mesh = new THREE.Mesh(tube, p.color);
-        mesh.userData = { id: `vessel-${i}`, name: p.color === vesselMat ? 'Artéria Periférica' : 'Veia Periférica' };
-        groupRef.current.add(mesh);
-        partsRef.current.push({ mesh, offset: new THREE.Vector3(...p.end), id: `vessel-${i}`, name: mesh.userData.name });
-      });
+        const aorta = new THREE.Mesh(new THREE.TubeGeometry(aortaCurve, 20, 0.18, 8, false), vesselMat);
+        aorta.userData = { id: 'aorta', name: 'Aorta' };
+        groupRef.current.add(aorta);
+        partsRef.current.push({ mesh: aorta, offset: new THREE.Vector3(0.8, 1.4, 0.2), id: 'aorta', name: 'Aorta' });
 
-      // Capilares (pontos vermelhos pequenos nas extremidades)
-      const capPositions = [
-        [2.4, 1.5, 0.5], [2.4, -1.5, 0.5], [-2.4, 1.5, 0.5], [-2.4, -1.5, 0.5],
-        [0, 2.2, 0], [0, -2.2, 0],
-      ];
-      capPositions.forEach((pos, i) => {
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-        cap.position.set(...pos);
-        cap.userData = { id: `capillary-${i}`, name: 'Capilares' };
-        groupRef.current.add(cap);
-        partsRef.current.push({ mesh: cap, offset: new THREE.Vector3(...pos), id: `capillary-${i}`, name: 'Capilares' });
-      });
+        const pulmCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.4, 0.5, 0.2),
+          new THREE.Vector3(-1.0, 0.8, 0.4),
+          new THREE.Vector3(-1.4, 0.5, 0.2),
+        ]);
+        const pulm = new THREE.Mesh(new THREE.TubeGeometry(pulmCurve, 15, 0.14, 8, false), vesselMat);
+        pulm.userData = { id: 'pulmonary-artery', name: 'Artéria Pulmonar' };
+        groupRef.current.add(pulm);
+        partsRef.current.push({ mesh: pulm, offset: new THREE.Vector3(-1.0, 0.7, 0.3), id: 'pulmonary-artery', name: 'Artéria Pulmonar' });
 
-      // Linhas de conexão sutis (opcional, para visual de rede)
-      const lineMaterial = new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.35 });
-      const linePoints = [
-        [0, 0.2, 0, 0, 0.9, 0],
-        [0, 0.2, 0, -0.4, 0.5, 0.2],
-        [0, 0.2, 0, -0.3, -1.1, -0.4],
-      ];
-      linePoints.forEach((p, i) => {
-        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...p.slice(0, 3)), new THREE.Vector3(...p.slice(3))]);
-        const line = new THREE.Line(geo, lineMaterial);
-        groupRef.current.add(line);
-      });
+        const vcsCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.5, 1.5, -0.4),
+          new THREE.Vector3(-0.2, 0.9, -0.2),
+        ]);
+        const vcs = new THREE.Mesh(new THREE.TubeGeometry(vcsCurve, 12, 0.16, 6, false), veinMat);
+        vcs.userData = { id: 'vena-cava-superior', name: 'Veia Cava Superior' };
+        groupRef.current.add(vcs);
+        partsRef.current.push({ mesh: vcs, offset: new THREE.Vector3(-0.4, 1.2, -0.3), id: 'vena-cava-superior', name: 'Veia Cava Superior' });
+
+        const vciCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.3, -1.1, -0.4),
+          new THREE.Vector3(-0.1, -0.3, -0.2),
+        ]);
+        const vci = new THREE.Mesh(new THREE.TubeGeometry(vciCurve, 12, 0.16, 6, false), veinMat);
+        vci.userData = { id: 'vena-cava-inferior', name: 'Veia Cava Inferior' };
+        groupRef.current.add(vci);
+        partsRef.current.push({ mesh: vci, offset: new THREE.Vector3(-0.2, -0.7, -0.3), id: 'vena-cava-inferior', name: 'Veia Cava Inferior' });
+
+        const peripheral = [
+          { start: [1.2, 0.8, 0], end: [2.2, 1.4, 0.4], color: vesselMat, id: 'peripheral-artery', name: 'Artéria Periférica' },
+          { start: [1.2, -0.8, 0], end: [2.2, -1.4, 0.4], color: vesselMat, id: 'peripheral-artery-2', name: 'Artéria Periférica' },
+          { start: [-1.2, 0.8, 0], end: [-2.2, 1.4, 0.4], color: veinMat, id: 'peripheral-vein', name: 'Veia Periférica' },
+          { start: [-1.2, -0.8, 0], end: [-2.2, -1.4, 0.4], color: veinMat, id: 'peripheral-vein-2', name: 'Veia Periférica' },
+        ];
+        peripheral.forEach((p, i) => {
+          const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(...p.start),
+            new THREE.Vector3((p.start[0] + p.end[0]) / 2, (p.start[1] + p.end[1]) / 2 + 0.3, (p.start[2] + p.end[2]) / 2),
+            new THREE.Vector3(...p.end),
+          ]);
+          const tube = new THREE.TubeGeometry(curve, 10, 0.09, 6, false);
+          const mesh = new THREE.Mesh(tube, p.color);
+          mesh.userData = { id: p.id, name: p.name };
+          groupRef.current.add(mesh);
+          partsRef.current.push({ mesh, offset: new THREE.Vector3(...p.end), id: p.id, name: p.name });
+        });
+
+        const capPositions = [
+          [2.4, 1.5, 0.5], [2.4, -1.5, 0.5], [-2.4, 1.5, 0.5], [-2.4, -1.5, 0.5],
+          [0, 2.2, 0], [0, -2.2, 0],
+        ];
+        capPositions.forEach((pos, i) => {
+          const cap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+          cap.position.set(...pos);
+          cap.userData = { id: `capillary-${i}`, name: 'Capilares' };
+          groupRef.current.add(cap);
+          partsRef.current.push({ mesh: cap, offset: new THREE.Vector3(...pos), id: `capillary-${i}`, name: 'Capilares' });
+        });
+      }
 
       if (disassembled) {
         partsRef.current.forEach(({ mesh, offset }) => {
           mesh.position.lerp(offset, 0.05);
         });
       }
-    }, []);
+    }, [scene, nodes, disassembled, hasModel]);
 
     useFrame((state) => {
       if (!groupRef.current) return;
@@ -854,7 +870,7 @@ export default function App() {
         {selectedOrgan === 'circulatory' && !disassembled && (
           <>
             {partsRef.current.map((part) => (
-              <Html key={part.id} position={disassembled ? [part.offset.x, part.offset.y, part.offset.z] : [0, 0, 0]}>
+              <Html key={part.id} position={[part.offset.x, part.offset.y, part.offset.z]}>
                 <div
                   onClick={() => addNotification(`Selecionado: ${part.name}`)}
                   className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400`}
