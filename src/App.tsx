@@ -1012,7 +1012,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500 selection:text-black">
       {/* Toast Notifications */}
       <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {notifications.map((n) => (
@@ -1039,7 +1039,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+        <div className="flex flex-wrap justify-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 max-w-full">
           <button
             onClick={() => { setActiveTab('explorer'); addNotification('Modo Explorador 3D ativado'); }}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'explorer' ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
@@ -1129,8 +1129,8 @@ export default function App() {
 
         {/* Right Column: 3D Viewport */}
         <div className="flex-1 flex flex-col gap-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl flex-1 flex flex-col relative overflow-hidden min-h-[400px] lg:min-h-[500px]">
-            <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl relative overflow-hidden w-full h-[55vh] min-h-[380px] max-h-[620px] lg:h-auto lg:max-h-none lg:min-h-[500px] lg:flex-1">
+            <div className="absolute top-4 left-4 right-4 z-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pointer-events-none">
               <div className="bg-slate-950/80 backdrop-blur-md border border-slate-800/80 px-4 py-2 rounded-xl flex items-center gap-3 pointer-events-auto shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="text-xs font-mono text-slate-300">Simulação 3D Ativa (React Three Fiber)</span>
@@ -1160,11 +1160,12 @@ export default function App() {
             </div>
 
             {/* React Three Fiber Canvas */}
-            <div className="w-full flex-1 cursor-grab active:cursor-grabbing h-full">
+            <div className="absolute inset-0 z-0 cursor-grab active:cursor-grabbing touch-none">
               <Canvas
-                camera={{ position: [0, 0, 7], fov: 50 }}
+                camera={{ position: [0, 0, 7.5], fov: 50 }}
+                resize={{ scroll: false, debounce: { scroll: 50, resize: 0 } }}
                 shadows
-                gl={{ antialias: true, alpha: true, localClippingEnabled: true, powerPreference: 'high-performance' }}
+                gl={{ antialias: true, alpha: true, localClippingEnabled: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}
                 style={{ width: '100%', height: '100%', display: 'block' }}
               >
                 <ambientLight intensity={1.2} />
