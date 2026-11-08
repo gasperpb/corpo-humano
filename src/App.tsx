@@ -106,6 +106,19 @@ export default function App() {
       ],
       layers: ['Coração', 'Aorta', 'Artérias', 'Veias', 'Capilares'],
     },
+    biceps: {
+      name: 'Bíceps Braquial',
+      system: 'Sistema Muscular',
+      weight: 'Aprox. 200g - 250g',
+      color: '#f43f5e',
+      description: 'Músculo biarticular da parte anterior do braço, formado por duas cabeças (longa e curta). Responsável pela flexão do cotovelo e supinação do antebraço.',
+      clinicalNotes: [
+        'Possui duas cabeças: longa (origem na cavidade glenoidal) e curta (processo coracoide).',
+        'Inserção comum no tuberosidade do rádio através do tendão distal.',
+        'A aponeurose bicipital (lacertus fibrosus) o conecta à fáscia do antebraço.',
+      ],
+      layers: ['Cabeça Longa', 'Cabeça Curta', 'Aponeurose Bicipital', 'Tendão Distal', 'Tendões Proximais'],
+    },
   };
 
   const heartParts = [
@@ -852,6 +865,130 @@ export default function App() {
     );
   };
 
+  // ---------------- Generic GLB anatomy (real model + labels + teardown) ----------------
+
+  const bicepsLabels: Array<{ node: string; name: string }> = [
+    { node: 'Biceps brachii long head', name: 'Cabeça Longa' },
+    { node: 'Biceps brachii short head', name: 'Cabeça Curta' },
+    { node: 'Bicipital aponeurosis', name: 'Aponeurose Bicipital' },
+    { node: 'Common distal tendon to radial tuberosity', name: 'Tendão Distal Comum' },
+    { node: 'Long-head proximal tendon to supraglenoid attachment', name: 'Tendão Proximal (Cabeça Longa)' },
+    { node: 'Short-head proximal tendon to coracoid attachment', name: 'Tendão Proximal (Cabeça Curta)' },
+  ];
+
+  const AnatomyModel: React.FC<{
+    url: string;
+    labels: Array<{ node: string; name: string }>;
+    fitSize: number;
+    accent: string;
+    disassembled: boolean;
+  }> = ({ url, labels, fitSize, accent, disassembled }) => {
+    const wrapperRef = useRef<THREE.Group>(null);
+    const labelRefs = useRef<Array<THREE.Group | null>>([]);
+    const { scene } = useGLTF(url);
+
+    const { model, scale, offset, parts, movers, explodeDist } = useMemo(() => {
+      if (!scene) {
+        return {
+          model: null as THREE.Object3D | null,
+          scale: 1,
+          offset: new THREE.Vector3(),
+          parts: [] as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>,
+          movers: [] as Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }>,
+          explodeDist: 0,
+        };
+      }
+
+      const clone = scene.clone(true);
+      clone.traverse((child: any) => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.needsUpdate = true;
+        }
+      });
+      clone.updateMatrixWorld(true);
+
+      const box = new THREE.Box3().setFromObject(clone);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const scale = fitSize / maxDim;
+
+      const movers: Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }> = [];
+      clone.traverse((o: any) => {
+        if (!o.isMesh) return;
+        const mb = new THREE.Box3().setFromObject(o);
+        const mc = mb.getCenter(new THREE.Vector3());
+        const dir = mc.clone().sub(center);
+        if (dir.lengthSq() < 1e-9) dir.set(0, 0, 0);
+        else dir.normalize();
+        movers.push({ mesh: o, dir });
+      });
+
+      const parts = labels
+        .map(({ node, name }) => {
+          const mesh = clone.getObjectByName(node);
+          if (!mesh) return null;
+          const mb = new THREE.Box3().setFromObject(mesh);
+          const mc = mb.getCenter(new THREE.Vector3());
+          return { id: node, name, mesh, center: mc };
+        })
+        .filter(Boolean) as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>;
+
+      return {
+        model: clone,
+        scale,
+        offset: new THREE.Vector3(-center.x * scale, -center.y * scale, -center.z * scale),
+        parts,
+        movers,
+        explodeDist: maxDim * 0.35,
+      };
+    }, [scene, url, fitSize, labels]);
+
+    useFrame(() => {
+      if (!wrapperRef.current) return;
+      if (!disassembled) wrapperRef.current.rotation.y += 0.003;
+      const target = new THREE.Vector3();
+      movers.forEach(({ mesh, dir }) => {
+        if (disassembled) target.copy(dir).multiplyScalar(explodeDist);
+        else target.set(0, 0, 0);
+        mesh.position.lerp(target, 0.08);
+      });
+      parts.forEach((part, i) => {
+        const g = labelRefs.current[i];
+        if (g) g.position.copy(part.center).add(part.mesh.position);
+      });
+    });
+
+    return (
+      <group dispose={null}>
+        <ambientLight intensity={1.2} />
+        <pointLight position={[0, 0, 5]} intensity={2} />
+        <group ref={wrapperRef} dispose={null}>
+          <group scale={scale} position={[offset.x, offset.y, offset.z]}>
+            {model && <primitive object={model} />}
+            {parts.map((part, i) => (
+              <group
+                key={part.id}
+                ref={(el) => { labelRefs.current[i] = el; }}
+                position={[part.center.x, part.center.y, part.center.z]}
+              >
+                <Html position={[0, 0, 0]}>
+                  <div
+                    onClick={() => addNotification(`Selecionado: ${part.name}`)}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold shadow-lg border cursor-pointer whitespace-nowrap bg-slate-900/90 ${accent} transition-all`}
+                  >
+                    {part.name}
+                  </div>
+                </Html>
+              </group>
+            ))}
+          </group>
+        </group>
+      </group>
+    );
+  };
+
   const Organ3D: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     switch (selectedOrgan) {
       case 'heart': return <HeartMesh disassembled={disassembled} />;
@@ -861,6 +998,15 @@ export default function App() {
       case 'kidneys': return <KidneysMesh disassembled={disassembled} />;
       case 'stomach': return <StomachMesh disassembled={disassembled} />;
       case 'circulatory': return <CirculatoryMesh disassembled={disassembled} />;
+      case 'biceps': return (
+        <AnatomyModel
+          url="/models/right-biceps-brachii.glb"
+          labels={bicepsLabels}
+          fitSize={3}
+          accent="text-rose-300 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-400"
+          disassembled={disassembled}
+        />
+      );
       default: return null;
     }
   };
@@ -921,7 +1067,7 @@ export default function App() {
           <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl backdrop-blur-md shadow-xl">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center justify-between">
               <span>Selecione o Órgão</span>
-              <span className="text-xs text-cyan-400 normal-case bg-cyan-950/50 border border-cyan-800/50 px-2 py-0.5 rounded-full">6 Órgãos</span>
+              <span className="text-xs text-cyan-400 normal-case bg-cyan-950/50 border border-cyan-800/50 px-2 py-0.5 rounded-full">{Object.keys(organsData).length} Órgãos</span>
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(organsData).map(([key, organ]) => {
