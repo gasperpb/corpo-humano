@@ -764,9 +764,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row p-6 gap-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 flex flex-col lg:flex-row p-4 md:p-6 gap-4 md:gap-6 max-w-7xl mx-auto w-full">
         {/* Left Column */}
-        <div className="w-full lg:w-96 flex flex-col gap-6">
+        <div className="w-full lg:w-96 flex flex-col gap-4 md:gap-6">
           <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl backdrop-blur-md shadow-xl">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center justify-between">
               <span>Selecione o Órgão</span>
@@ -832,7 +832,7 @@ export default function App() {
 
         {/* Right Column: 3D Viewport */}
         <div className="flex-1 flex flex-col gap-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl flex-1 flex flex-col relative overflow-hidden min-h-[500px]">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl backdrop-blur-md shadow-xl flex-1 flex flex-col relative overflow-hidden min-h-[400px] lg:min-h-[500px]">
             <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
               <div className="bg-slate-950/80 backdrop-blur-md border border-slate-800/80 px-4 py-2 rounded-xl flex items-center gap-3 pointer-events-auto shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
