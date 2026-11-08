@@ -1,7 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Stars, useGLTF, Html } from '@react-three/drei';
-import { GLTFLoader } from 'three-stdlib';
 import * as THREE from 'three';
 
 export default function App() {
@@ -157,77 +156,26 @@ export default function App() {
   const HeartMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
     const groupRef = useRef<THREE.Group>(null);
     const partsRef = useRef<Array<{ mesh: THREE.Mesh; offset: THREE.Vector3; part: (typeof heartParts)[number] }>>([]);
-    const modelRef = useRef<THREE.Group | null>(null);
-    const [gltfScene, setGltfScene] = useState<THREE.Group | null>(null);
-    const proceduralAddedRef = useRef(false);
-    const loaderRef = useRef(new GLTFLoader());
+    const { scene } = useGLTF('/models/realistic_human_heart.glb');
 
     useEffect(() => {
       if (!groupRef.current) return;
-      groupRef.current!.clear();
 
       if (disassembled) {
+        const existingParts = groupRef.current!.children.filter(c => c.name === 'heart-part');
+        if (existingParts.length === partsRef.current.length && existingParts.length > 0) return;
+        groupRef.current!.clear();
         partsRef.current.forEach(({ mesh }) => {
+          mesh.name = 'heart-part';
           groupRef.current!.add(mesh);
         });
         return;
       }
 
-      if (gltfScene && !modelRef.current) {
-        const clone = gltfScene.clone();
-        clone.traverse((child: any) => {
-          if (child.isMesh) {
-            child.material = child.material.clone();
-            child.material.needsUpdate = true;
-            child.material.emissive = new THREE.Color(0xef4444);
-            child.material.emissiveIntensity = 1.0;
-            child.material.side = THREE.DoubleSide;
-          }
-        });
-        clone.scale.setScalar(2.0);
-        clone.position.set(0, 0, 0);
-        clone.updateMatrixWorld();
-        modelRef.current = clone;
-      }
-      if (modelRef.current) {
-        groupRef.current!.add(modelRef.current.clone());
-      }
-
-      if (!proceduralAddedRef.current) {
-        const heartShape = new THREE.Shape();
-        const x = 0, y = 0;
-        heartShape.moveTo(x + 0.5, y + 0.5);
-        heartShape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y);
-        heartShape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7);
-        heartShape.bezierCurveTo(x - 0.6, y + 1.4, x + 0.3, y + 2.1, x, y + 2.5);
-        heartShape.bezierCurveTo(x - 0.3, y + 2.1, x - 0.6, y + 1.4, x - 0.6, y + 0.7);
-        heartShape.bezierCurveTo(x - 0.6, y + 0.7, x - 0.6, y, x - 0.5, y);
-        heartShape.bezierCurveTo(x - 0.5, y, x - 0.5, y + 0.5, x - 0.2, y + 0.5);
-        heartShape.bezierCurveTo(x - 0.2, y + 0.5, x, y + 0.8, x, y + 1.2);
-        heartShape.bezierCurveTo(x, y + 0.8, x + 0.2, y + 0.5, x + 0.5, y + 0.5);
-
-        const extrudeSettings = { depth: 0.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6 };
-        const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
-        geometry.center();
-
-        const material = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.rotation.x = Math.PI / 2;
-        mesh.position.set(0, 0, 0);
-        mesh.scale.setScalar(1.2);
-        mesh.name = 'heart-procedural';
-        groupRef.current!.add(mesh);
-        proceduralAddedRef.current = true;
-      }
-    }, [gltfScene, disassembled]);
-
-    useEffect(() => {
-      loaderRef.current.loadAsync('/models/realistic_human_heart.glb').then((gltf) => {
-        setGltfScene(gltf.scene);
-      }).catch((err) => {
-        console.warn('HeartMesh: falha ao carregar GLB, usando procedimental', err);
+      groupRef.current!.children.forEach((c: any) => {
+        if (c.name === 'heart-part') groupRef.current!.remove(c);
       });
-    }, []);
+    }, [scene, disassembled]);
 
     useFrame((state: any, delta: number) => {
       if (!groupRef.current) return;
@@ -248,68 +196,17 @@ export default function App() {
     });
 
     return (
-      <group ref={groupRef} dispose={null}>
+      <group dispose={null}>
         <ambientLight intensity={1.5} />
         <pointLight position={[0, 0, 4]} intensity={2} distance={20} />
         <pointLight position={[4, 0, 0]} intensity={1} distance={15} />
         <pointLight position={[-4, 0, 0]} intensity={1} distance={15} />
-        {selectedOrgan === 'heart' && !disassembled && (
-          <>
-            {heartParts.map((part) => (
-              <Html key={part.id} position={part.pos as [number, number, number]}>
-                <div
-                  onClick={() => setSelectedHeartPart(part.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
-                    selectedHeartPart === part.id
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
-                      : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
-                  }`}
-                >
-                  {part.name}
-                </div>
-                {selectedHeartPart === part.id && (
-                  <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
-                    <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
-                    <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
-                  </div>
-                )}
-              </Html>
-            ))}
-          </>
-        )}
-        {disassembled && selectedOrgan === 'heart' && (
-          <>
-            {heartParts.map((part) => {
-              let partMesh = partsRef.current.find((p) => p.part.id === part.id);
-              if (!partMesh) {
-                const colorMap: Record<string, number> = {
-                  'atrio-direito': 0xef4444,
-                  'atrio-esquerdo': 0xdc2626,
-                  'ventriculo-direito': 0xb91c1c,
-                  'ventriculo-esquerdo': 0x991b1b,
-                  'valvula-tricuspide': 0xf97316,
-                  'valvula-mitral': 0xf97316,
-                  'valvula-pulmonar': 0xef4444,
-                  'valvula-aortica': 0xef4444,
-                  aorta: 0xb91c1c,
-                  'veia-cava-superior': 0x7f1d1d,
-                  'veia-cava-inferior': 0x7f1d1d,
-                  'arteria-pulmonar': 0xb91c1c,
-                  pericardio: 0x6b7280,
-                  miocardio: 0xef4444,
-                  endocardio: 0xfee2e2,
-                };
-                const mesh = new THREE.Mesh(
-                  new THREE.SphereGeometry(0.25, 16, 16),
-                  new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
-                );
-                mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-                mesh.userData = { partId: part.id };
-                partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
-                partsRef.current.push(partMesh);
-              }
-              return (
-                <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
+        {!disassembled && <primitive object={scene} scale={2} />}
+        <group ref={groupRef} dispose={null}>
+          {selectedOrgan === 'heart' && !disassembled && (
+            <>
+              {heartParts.map((part) => (
+                <Html key={part.id} position={part.pos as [number, number, number]}>
                   <div
                     onClick={() => setSelectedHeartPart(part.id)}
                     className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
@@ -327,10 +224,64 @@ export default function App() {
                     </div>
                   )}
                 </Html>
-              );
-            })}
-          </>
-        )}
+              ))}
+            </>
+          )}
+          {disassembled && selectedOrgan === 'heart' && (
+            <>
+              {heartParts.map((part) => {
+                let partMesh = partsRef.current.find((p) => p.part.id === part.id);
+                if (!partMesh) {
+                  const colorMap: Record<string, number> = {
+                    'atrio-direito': 0xef4444,
+                    'atrio-esquerdo': 0xdc2626,
+                    'ventriculo-direito': 0xb91c1c,
+                    'ventriculo-esquerdo': 0x991b1b,
+                    'valvula-tricuspide': 0xf97316,
+                    'valvula-mitral': 0xf97316,
+                    'valvula-pulmonar': 0xef4444,
+                    'valvula-aortica': 0xef4444,
+                    aorta: 0xb91c1c,
+                    'veia-cava-superior': 0x7f1d1d,
+                    'veia-cava-inferior': 0x7f1d1d,
+                    'arteria-pulmonar': 0xb91c1c,
+                    pericardio: 0x6b7280,
+                    miocardio: 0xef4444,
+                    endocardio: 0xfee2e2,
+                  };
+                  const mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.25, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: colorMap[part.id] ?? 0xef4444, roughness: 0.4 })
+                  );
+                  mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+                  mesh.userData = { partId: part.id };
+                  partMesh = { mesh, offset: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), part };
+                  partsRef.current.push(partMesh);
+                }
+                return (
+                  <Html key={part.id} position={[partMesh.mesh.position.x * 3, partMesh.mesh.position.y * 3, partMesh.mesh.position.z * 3]}>
+                    <div
+                      onClick={() => setSelectedHeartPart(part.id)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                        selectedHeartPart === part.id
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                          : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/20 hover:border-cyan-400'
+                      }`}
+                    >
+                      {part.name}
+                    </div>
+                    {selectedHeartPart === part.id && (
+                      <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                        <p className="text-xs font-semibold text-cyan-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                        <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                      </div>
+                    )}
+                  </Html>
+                );
+              })}
+            </>
+          )}
+        </group>
       </group>
     );
   };
