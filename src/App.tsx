@@ -732,37 +732,17 @@ export default function App() {
     const groupRef = useRef<THREE.Group>(null);
     const partsRef = useRef<Array<{ mesh: THREE.Mesh | THREE.Line; offset: THREE.Vector3; id: string; name: string }>>([]);
     const { scene, nodes } = useGLTF('/models/circulatory-system-figure.glb');
-    const [hasModel, setHasModel] = useState(false);
 
     useEffect(() => {
       if (!groupRef.current) return;
 
-      if (scene && !hasModel) {
-        // Modelo real carregado
-        const clone = scene.clone(true);
-        clone.traverse((child: any) => {
-          if (child.isMesh) {
-            child.material = child.material.clone();
-            child.material.needsUpdate = true;
-          }
-        });
-        clone.position.set(0, 0, 0);
-        clone.scale.setScalar(1.2);
-        groupRef.current!.add(clone);
-        setHasModel(true);
+      // Limpar grupo e resetar partes antes de carregar
+      while (groupRef.current!.children.length > 0) {
+        groupRef.current!.remove(groupRef.current!.children[0]);
+      }
+      partsRef.current = [];
 
-        // Criar partsRef com base nos nós do modelo, fallback para positions padrão
-        circulatoryParts.forEach((part) => {
-          const node = nodes[part.id] as THREE.Object3D | undefined;
-          const offset = node ? new THREE.Vector3(node.position.x, node.position.y, node.position.z) : new THREE.Vector3(...part.pos);
-          const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
-          mesh.position.copy(offset);
-          mesh.userData = { id: part.id, name: part.name };
-          partsRef.current.push({ mesh, offset, id: part.id, name: part.name });
-          groupRef.current!.add(mesh);
-        });
-      } else {
-        // Fallback procedural se o modelo não existir
+      const buildProcedural = () => {
         const heartMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4, metalness: 0.1 });
         const vesselMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
         const veinMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
@@ -843,6 +823,32 @@ export default function App() {
           groupRef.current.add(cap);
           partsRef.current.push({ mesh: cap, offset: new THREE.Vector3(...pos), id: `capillary-${i}`, name: 'Capilares' });
         });
+      };
+
+      if (scene) {
+        // Modelo real carregado
+        const clone = scene.clone(true);
+        clone.traverse((child: any) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.needsUpdate = true;
+          }
+        });
+        clone.position.set(0, 0, 0);
+        clone.scale.setScalar(1.2);
+        groupRef.current!.add(clone);
+
+        circulatoryParts.forEach((part) => {
+          const node = nodes[part.id] as THREE.Object3D | undefined;
+          const offset = node ? new THREE.Vector3(node.position.x, node.position.y, node.position.z) : new THREE.Vector3(...part.pos);
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
+          mesh.position.copy(offset);
+          mesh.userData = { id: part.id, name: part.name };
+          partsRef.current.push({ mesh, offset, id: part.id, name: part.name });
+          groupRef.current!.add(mesh);
+        });
+      } else {
+        buildProcedural();
       }
 
       if (disassembled) {
@@ -850,7 +856,7 @@ export default function App() {
           mesh.position.lerp(offset, 0.05);
         });
       }
-    }, [scene, nodes, disassembled, hasModel]);
+    }, [scene, nodes, disassembled]);
 
     useFrame((state) => {
       if (!groupRef.current) return;
