@@ -3,13 +3,33 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Stars, useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
+type AnatomyPart = {
+  id: string;
+  name: string;
+  mesh: THREE.Object3D;
+  center: THREE.Vector3;
+  kind: 'pivot' | 'head' | 'other';
+};
+
+type CurlRig = {
+  pivot: THREE.Vector3;
+  pivoted: THREE.Object3D[];
+  pivotedLocalPivot: Map<THREE.Object3D, THREE.Vector3>;
+  heads: Array<{ node: THREE.Object3D; localCenter: THREE.Vector3 }>;
+  ghost: THREE.Group;
+  wrist: THREE.Group;
+};
+
 export default function App() {
-  const [selectedOrgan, setSelectedOrgan] = useState('heart');
+  const [selectedOrgan, setSelectedOrgan] = useState('biceps');
   const [selectedHeartPart, setSelectedHeartPart] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('explorer');
   const [disassembled, setDisassembled] = useState(false);
   const [rotationSpeed, setRotationSpeed] = useState(0);
+  const [curlActive, setCurlActive] = useState(true);
   const [heartRate, setHeartRate] = useState(72);
+  const [heartModel, setHeartModel] = useState<1 | 2>(1);
+  const [lungModel, setLungModel] = useState<1 | 2>(1);
   const [bodyTemp, setBodyTemp] = useState(36.6);
   const [oxygenLevel, setOxygenLevel] = useState(98);
   const [notifications, setNotifications] = useState<Array<{ id: number; msg: string }>>([]);
@@ -157,6 +177,19 @@ export default function App() {
         'A aponeurose bicipital (lacertus fibrosus) o conecta à fáscia do antebraço.',
       ],
       layers: ['Cabeça Longa', 'Cabeça Curta', 'Aponeurose Bicipital', 'Tendão Distal', 'Tendões Proximais'],
+    },
+    triceps: {
+      name: 'Tríceps Braquial',
+      system: 'Sistema Muscular',
+      weight: 'Aprox. 180g - 250g',
+      color: '#fb7185',
+      description: 'Músculo da parte posterior do braço, formado por três cabeças (longa, lateral e medial). É o principal responsável pela extensão do cotovelo e auxilia na extensão e adução do ombro.',
+      clinicalNotes: [
+        'Três cabeças: longa (túber isquiático da escápula), lateral e medial (úmero).',
+        'Inserção comum no olecrano da ulna através do tendão distal.',
+        'Inervado pelo nervo radial (C6-C8); o reflexo do tríceps testa esse segmento.',
+      ],
+      layers: ['Cabeça Longa', 'Cabeça Lateral', 'Cabeça Medial', 'Tendão Distal', 'Tendões Proximais'],
     },
   };
 
@@ -915,26 +948,35 @@ export default function App() {
     { node: 'Short-head proximal tendon to coracoid attachment', name: 'Tendão Proximal (Cabeça Curta)' },
   ];
 
+  const tricepsLabels: Array<{ node: string; name: string }> = [
+    { node: 'Right triceps brachii long', name: 'Cabeça Longa' },
+    { node: 'Right triceps brachii lateral', name: 'Cabeça Lateral' },
+    { node: 'Right triceps brachii medial', name: 'Cabeça Medial' },
+  ];
+
   const AnatomyModel: React.FC<{
     url: string;
     labels: Array<{ node: string; name: string }>;
     fitSize: number;
     accent: string;
     disassembled: boolean;
-  }> = ({ url, labels, fitSize, accent, disassembled }) => {
+    motion?: 'spin' | 'curl';
+    curlActive?: boolean;
+  }> = ({ url, labels, fitSize, accent, disassembled, motion = 'spin', curlActive = false }) => {
     const wrapperRef = useRef<THREE.Group>(null);
     const labelRefs = useRef<Array<THREE.Group | null>>([]);
     const { scene } = useGLTF(url);
 
-    const { model, scale, offset, parts, movers, explodeDist } = useMemo(() => {
+    const { model, scale, offset, parts, movers, explodeDist, curl } = useMemo(() => {
       if (!scene) {
         return {
           model: null as THREE.Object3D | null,
           scale: 1,
           offset: new THREE.Vector3(),
-          parts: [] as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>,
+          parts: [] as AnatomyPart[],
           movers: [] as Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }>,
           explodeDist: 0,
+          curl: null as CurlRig | null,
         };
       }
 
@@ -964,15 +1006,111 @@ export default function App() {
         movers.push({ mesh: o, dir });
       });
 
+      const pivotNames = ['Common distal tendon to radial tuberosity', 'Bicipital aponeurosis'];
+      const headNames = ['Biceps brachii long head', 'Biceps brachii short head'];
+
       const parts = labels
         .map(({ node, name }) => {
           const mesh = clone.getObjectByName(node);
           if (!mesh) return null;
           const mb = new THREE.Box3().setFromObject(mesh);
           const mc = mb.getCenter(new THREE.Vector3());
-          return { id: node, name, mesh, center: mc };
+          const kind: AnatomyPart['kind'] = pivotNames.includes(node)
+            ? 'pivot'
+            : headNames.includes(node)
+              ? 'head'
+              : 'other';
+          return { id: node, name, mesh, center: mc, kind };
         })
-        .filter(Boolean) as Array<{ id: string; name: string; mesh: THREE.Object3D; center: THREE.Vector3 }>;
+        .filter(Boolean) as AnatomyPart[];
+
+      let curl: CurlRig | null = null;
+      if (motion === 'curl') {
+        const distal = clone.getObjectByName('Common distal tendon to radial tuberosity');
+        if (distal) {
+          const db = new THREE.Box3().setFromObject(distal);
+          const dc = db.getCenter(new THREE.Vector3());
+          const pivot = new THREE.Vector3(dc.x, db.max.y, dc.z);
+
+          const pivoted = pivotNames
+            .map((n) => clone.getObjectByName(n))
+            .filter(Boolean) as THREE.Object3D[];
+          const pivotedLocalPivot = new Map<THREE.Object3D, THREE.Vector3>();
+          pivoted.forEach((node) => {
+            const parentWorld = node.parent ? node.parent.matrixWorld : new THREE.Matrix4();
+            const inv = new THREE.Matrix4().copy(parentWorld).invert();
+            pivotedLocalPivot.set(node, pivot.clone().applyMatrix4(inv));
+          });
+
+          const heads = headNames
+            .map((n) => clone.getObjectByName(n))
+            .filter(Boolean)
+            .map((node) => {
+              const hb = new THREE.Box3().setFromObject(node!);
+              const centerScene = hb.getCenter(new THREE.Vector3());
+              const parentWorld = node!.parent ? node!.parent!.matrixWorld : new THREE.Matrix4();
+              const inv = new THREE.Matrix4().copy(parentWorld).invert();
+              return { node: node!, localCenter: centerScene.clone().applyMatrix4(inv) };
+            });
+
+          const forearmLength = 0.19;
+          const ghost = new THREE.Group();
+          ghost.name = 'curl-ghost';
+          ghost.position.copy(pivot);
+
+          const ghostMat = new THREE.MeshStandardMaterial({
+            color: 0x94a3b8,
+            transparent: true,
+            opacity: 0.22,
+            roughness: 0.7,
+            metalness: 0.05,
+            depthWrite: false,
+          });
+          const handMat = new THREE.MeshStandardMaterial({
+            color: 0xcbd5e1,
+            transparent: true,
+            opacity: 0.28,
+            roughness: 0.6,
+            depthWrite: false,
+          });
+          const barMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.9, roughness: 0.25 });
+          const plateMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.4 });
+
+          const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.017, forearmLength, 20), ghostMat);
+          forearm.position.set(0, -forearmLength / 2, 0);
+          ghost.add(forearm);
+
+          const wrist = new THREE.Group();
+          wrist.position.set(0, -forearmLength, 0);
+          ghost.add(wrist);
+
+          const hand = new THREE.Mesh(new THREE.SphereGeometry(0.032, 20, 16), handMat);
+          hand.scale.set(1, 1.15, 0.8);
+          wrist.add(hand);
+
+          const barLen = 0.42;
+          const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, barLen, 16), barMat);
+          bar.rotation.z = Math.PI / 2;
+          wrist.add(bar);
+
+          [-1, 1].forEach((sx) => {
+            const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.018, 24), plateMat);
+            plate.rotation.z = Math.PI / 2;
+            plate.position.x = sx * (barLen / 2 - 0.045);
+            wrist.add(plate);
+
+            const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 16), barMat);
+            collar.rotation.z = Math.PI / 2;
+            collar.position.x = sx * (barLen / 2 - 0.08);
+            wrist.add(collar);
+          });
+
+          ghost.visible = false;
+          clone.add(ghost);
+
+          curl = { pivot, pivoted, pivotedLocalPivot, heads, ghost, wrist };
+        }
+      }
 
       return {
         model: clone,
@@ -981,21 +1119,81 @@ export default function App() {
         parts,
         movers,
         explodeDist: maxDim * 0.35,
+        curl,
       };
-    }, [scene, url, fitSize, labels]);
+    }, [scene, url, fitSize, labels, motion]);
 
-    useFrame(() => {
+    useFrame((state) => {
       if (!wrapperRef.current) return;
-      if (!disassembled) wrapperRef.current.rotation.y += 0.003;
+      const animatingCurl = !!curl && !disassembled && curlActive;
+      if (!disassembled && !animatingCurl) wrapperRef.current.rotation.y += 0.003;
+
+      let curlQuat: THREE.Quaternion | null = null;
+      if (animatingCurl && curl) {
+        const t = state.clock.getElapsedTime();
+        const flexRaw = 0.5 - 0.5 * Math.cos(t * 1.5);
+        const flex = Math.pow(flexRaw, 1.15);
+        const angle = flex * 1.95;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(angle * 0.16, 0, angle));
+        curlQuat = q;
+
+        curl.pivoted.forEach((node) => {
+          const pLocal = curl!.pivotedLocalPivot.get(node)!;
+          const m = new THREE.Matrix4()
+            .makeTranslation(pLocal.x, pLocal.y, pLocal.z)
+            .multiply(new THREE.Matrix4().makeRotationFromQuaternion(q))
+            .multiply(new THREE.Matrix4().makeTranslation(-pLocal.x, -pLocal.y, -pLocal.z));
+          m.decompose(node.position, node.quaternion, node.scale);
+          node.updateMatrix();
+        });
+
+        const bulge = 1 + 0.11 * flex;
+        const shorten = 1 - 0.05 * flex;
+        curl.heads.forEach(({ node, localCenter }) => {
+          node.scale.set(bulge, shorten, bulge);
+          node.position.set(localCenter.x * (1 - bulge), localCenter.y * (1 - shorten), localCenter.z * (1 - bulge));
+          node.updateMatrix();
+        });
+
+        curl.ghost.visible = true;
+        curl.ghost.quaternion.copy(q);
+        curl.wrist.quaternion.copy(q).invert();
+      } else if (curl) {
+        curl.ghost.visible = false;
+        curl.ghost.quaternion.identity();
+        curl.wrist.quaternion.identity();
+        curl.pivoted.forEach((node) => {
+          node.position.lerp(new THREE.Vector3(0, 0, 0), 0.15);
+          node.quaternion.slerp(new THREE.Quaternion(), 0.15);
+          node.scale.lerp(new THREE.Vector3(1, 1, 1), 0.15);
+        });
+        curl.heads.forEach(({ node }) => {
+          node.position.lerp(new THREE.Vector3(0, 0, 0), 0.15);
+          node.scale.lerp(new THREE.Vector3(1, 1, 1), 0.15);
+        });
+      }
+
       const target = new THREE.Vector3();
       movers.forEach(({ mesh, dir }) => {
         if (disassembled) target.copy(dir).multiplyScalar(explodeDist);
         else target.set(0, 0, 0);
         mesh.position.lerp(target, 0.08);
       });
+
       parts.forEach((part, i) => {
         const g = labelRefs.current[i];
-        if (g) g.position.copy(part.center).add(part.mesh.position);
+        if (!g) return;
+        if (animatingCurl && curl && curlQuat) {
+          if (part.kind === 'pivot') {
+            g.position.copy(part.center).sub(curl.pivot).applyQuaternion(curlQuat).add(curl.pivot);
+            return;
+          }
+          if (part.kind === 'head') {
+            g.position.copy(part.center);
+            return;
+          }
+        }
+        g.position.copy(part.center).add(part.mesh.position);
       });
     });
 
@@ -1044,11 +1242,29 @@ export default function App() {
           fitSize={3}
           accent="text-rose-300 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-400"
           disassembled={disassembled}
+          motion="curl"
+          curlActive={curlActive}
+        />
+      );
+      case 'triceps': return (
+        <AnatomyModel
+          url="/models/right-triceps-brachii.glb"
+          labels={tricepsLabels}
+          fitSize={3}
+          accent="text-pink-300 border-pink-500/50 hover:bg-pink-500/20 hover:border-pink-400"
+          disassembled={disassembled}
         />
       );
       default: return null;
     }
   };
+
+  const embedSrc =
+    selectedOrgan === 'heart' && heartModel === 2
+      ? 'https://sketchfab.com/models/1582359649694207a2ad6bd0ebd0606a/embed'
+      : selectedOrgan === 'lungs' && lungModel === 2
+        ? 'https://sketchfab.com/models/98eae0ffe58a4e63b8d52c23813b3aaf/embed'
+        : null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500 selection:text-black">
@@ -1181,6 +1397,61 @@ export default function App() {
                 <span className="text-xs font-mono text-slate-300">Simulação 3D Ativa (React Three Fiber)</span>
               </div>
               <div className="flex items-center gap-2 pointer-events-auto">
+                {selectedOrgan === 'heart' && (
+                  <div className="flex items-center gap-1 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 p-1 rounded-xl shadow-lg">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1.5">Modelo:</span>
+                    <button
+                      onClick={() => { setHeartModel(1); addNotification('Modelo 3D Interativo (GLB) ativado'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${heartModel === 1 ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      1
+                    </button>
+                    <button
+                      onClick={() => { setHeartModel(2); addNotification('Modelo animado do Sketchfab ativado'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${heartModel === 2 ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      2
+                    </button>
+                  </div>
+                )}
+                {selectedOrgan === 'lungs' && (
+                  <div className="flex items-center gap-1 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 p-1 rounded-xl shadow-lg">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1.5">Modelo:</span>
+                    <button
+                      onClick={() => { setLungModel(1); addNotification('Modelo 3D Interativo (GLB) ativado'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${lungModel === 1 ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      1
+                    </button>
+                    <button
+                      onClick={() => { setLungModel(2); addNotification('Modelo do Sketchfab ativado'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${lungModel === 2 ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      2
+                    </button>
+                  </div>
+                )}
+                {selectedOrgan === 'biceps' && !disassembled && (
+                  <button
+                    onClick={() => {
+                      const next = !curlActive;
+                      setCurlActive(next);
+                      addNotification(next ? 'Rosca direta ativada' : 'Rosca direta pausada');
+                    }}
+                    title={curlActive ? 'Pausar animação de rosca direta' : 'Animar rosca direta'}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-lg flex items-center gap-2 ${
+                      curlActive
+                        ? 'bg-rose-500 text-slate-950 shadow-rose-500/20'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5v11M4 9v6m13.5-8.5v11M20 9v6M8 12h8"></path>
+                    </svg>
+                    {curlActive ? 'Pausar Rosca' : 'Rosca Direta'}
+                  </button>
+                )}
+                {!embedSrc && (
                 <button
                   onClick={() => {
                     setDisassembled(!disassembled);
@@ -1201,6 +1472,7 @@ export default function App() {
                   )}
                   {disassembled ? 'Montar Órgão' : 'Desmontar (Teardown)'}
                 </button>
+                )}
                 <button
                   onClick={toggleFullscreen}
                   title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
@@ -1221,6 +1493,7 @@ export default function App() {
             </div>
 
             {/* React Three Fiber Canvas */}
+            {!embedSrc && (
             <div className="absolute inset-0 z-0 cursor-grab active:cursor-grabbing touch-none">
               <Canvas
                 camera={{ position: [0, 0, 7.5], fov: 50 }}
@@ -1240,7 +1513,25 @@ export default function App() {
                 </Suspense>
               </Canvas>
             </div>
+            )}
 
+            {embedSrc && (
+              <div className="absolute inset-0 z-0 bg-slate-950">
+                <iframe
+                  title={selectedOrgan === 'lungs' ? 'Lungs with Bronchi and Trachea' : 'Heart Animated'}
+                  className="w-full h-full border-0"
+                  allowFullScreen
+                  allow="autoplay; fullscreen; xr-spatial-tracking"
+                  xr-spatial-tracking="true"
+                  execution-while-out-of-viewport="true"
+                  execution-while-not-rendered="true"
+                  web-share="true"
+                  src={embedSrc}
+                />
+              </div>
+            )}
+
+            {!embedSrc && (
             <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 p-4 rounded-xl shadow-lg pointer-events-auto">
               <div className="flex items-center gap-4 w-full md:w-auto">
                 <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Velocidade de Rotação:</span>
@@ -1267,6 +1558,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           {activeTab === 'stats' && (
