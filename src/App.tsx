@@ -113,6 +113,19 @@ export default function App() {
       ],
       layers: ['Dura-máter', 'Aracnoide', 'Pia-máter', 'Córtex Cerebral'],
     },
+    skull: {
+      name: 'Crânio (Skull)',
+      system: 'Sistema Esquelético',
+      weight: 'Aprox. 1.000g - 1.200g',
+      color: '#e7e5e4',
+      description: 'Estrutura óssea que forma a cabeça, protegendo o encéfalo e sustentando os órgãos dos sentidos e as estruturas da face.',
+      clinicalNotes: [
+        'Composto por 22 ossos: 8 do neurocrânio e 14 do viscerocrânio.',
+        'A mandíbula é o único osso móvel da cabeça.',
+        'As suturas cranianas fundem-se gradualmente com o avançar da idade.',
+      ],
+      layers: ['Neurocrânio', 'Viscerocrânio', 'Mandíbula', 'Suturas Cranianas', 'Cavidades Orbitárias'],
+    },
     liver: {
       name: 'Fígado (Liver)',
       system: 'Sistema Digestório / Metabólico',
@@ -239,6 +252,19 @@ export default function App() {
     { id: 'submucosa', name: 'Submucosa', pos: [0, -0.1, 0.35], desc: 'Camada de tecido conjuntivo que sustenta a mucosa e contém vasos e nervos.' },
     { id: 'camada-muscular', name: 'Camada Muscular', pos: [0, -0.1, 0.4], desc: 'Camada espessa de músculo liso responsável pelos movimentos de mistura do estômago.' },
     { id: 'serosa', name: 'Serosa', pos: [0, -0.1, 0.45], desc: 'Camada mais externa do estômago, membrana serosa que recobre o órgão.' },
+  ];
+
+  const skullParts = [
+    { id: 'frontal', name: 'Osso Frontal', frac: [0, 0.3, 0.42] as [number, number, number], desc: 'Forma a testa e o teto das órbitas; abriga os seios frontais.' },
+    { id: 'parietal', name: 'Ossos Parietais', frac: [0.42, 0.38, -0.1] as [number, number, number], desc: 'Par de ossos que constitui a maior parte da abóbada craniana.' },
+    { id: 'occipital', name: 'Osso Occipital', frac: [0, 0.12, -0.45] as [number, number, number], desc: 'Situa-se na parte posterior e inferior do crânio e contém o forame magno.' },
+    { id: 'temporal', name: 'Osso Temporal', frac: [-0.42, 0.05, 0.08] as [number, number, number], desc: 'Abriga os órgãos da audição e do equilíbrio e articula-se com a mandíbula.' },
+    { id: 'zigomatico', name: 'Osso Zigomático', frac: [0.3, 0.02, 0.38] as [number, number, number], desc: 'Forma a maçã do rosto e a parede lateral da órbita.' },
+    { id: 'maxila', name: 'Maxila', frac: [0, -0.16, 0.4] as [number, number, number], desc: 'Osso da face que sustenta os dentes superiores e forma parte do palato.' },
+    { id: 'mandibula', name: 'Mandíbula', frac: [0, -0.42, 0.32] as [number, number, number], desc: 'Único osso móvel do crânio; sustenta os dentes inferiores e participa da mastigação.' },
+    { id: 'orbita', name: 'Órbita', frac: [0.18, 0.14, 0.45] as [number, number, number], desc: 'Cavidade óssea que aloja o globo ocular, os músculos e os nervos oculares.' },
+    { id: 'cavidade-nasal', name: 'Cavidade Nasal', frac: [0, -0.02, 0.46] as [number, number, number], desc: 'Abertura central da face por onde o ar inspirado passa em direção à faringe.' },
+    { id: 'forame-magno', name: 'Forame Magno', frac: [0, -0.3, -0.28] as [number, number, number], desc: 'Grande abertura na base do crânio por onde passa a medula espinal.' },
   ];
 
   const addNotification = (msg: string) => {
@@ -800,6 +826,115 @@ export default function App() {
     );
   };
 
+  // ---------------- Skull (real .glb model) ----------------
+
+  const SkullMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
+    const wrapperRef = useRef<THREE.Group>(null);
+    const { scene } = useGLTF('/models/skull.glb');
+
+    const { model, scale, offset, labels } = useMemo(() => {
+      if (!scene) {
+        return {
+          model: null as THREE.Object3D | null,
+          scale: 1,
+          offset: new THREE.Vector3(),
+          labels: [] as Array<{ id: string; name: string; desc: string; pos: [number, number, number] }>,
+        };
+      }
+
+      const clone = scene.clone(true);
+      clone.traverse((child: any) => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.needsUpdate = true;
+        }
+      });
+      clone.updateMatrixWorld(true);
+
+      const box = new THREE.Box3().setFromObject(clone);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const fitScale = 3 / maxDim;
+
+      const labels = skullParts.map((part) => ({
+        id: part.id,
+        name: part.name,
+        desc: part.desc,
+        pos: [
+          center.x + size.x * part.frac[0],
+          center.y + size.y * part.frac[1],
+          center.z + size.z * part.frac[2],
+        ] as [number, number, number],
+      }));
+
+      return {
+        model: clone,
+        scale: fitScale,
+        offset: new THREE.Vector3(-center.x * fitScale, -center.y * fitScale, -center.z * fitScale),
+        labels,
+      };
+    }, [scene]);
+
+    useEffect(() => {
+      if (!model) return;
+      model.traverse((child: any) => {
+        if (!child.isMesh) return;
+        child.material.transparent = disassembled;
+        child.material.opacity = disassembled ? 0.22 : 1;
+        child.material.depthWrite = !disassembled;
+        child.material.needsUpdate = true;
+      });
+    }, [model, disassembled]);
+
+    useFrame(() => {
+      if (!wrapperRef.current || disassembled) return;
+      wrapperRef.current.rotation.y += rotationSpeed;
+    });
+
+    return (
+      <group dispose={null}>
+        <ambientLight intensity={1.4} />
+        <pointLight position={[0, 0, 4]} intensity={2} distance={20} />
+        <pointLight position={[4, 0, 0]} intensity={1} distance={15} />
+        <pointLight position={[-4, 0, 0]} intensity={1} distance={15} />
+        <group ref={wrapperRef} dispose={null}>
+          <group scale={scale} position={[offset.x, offset.y, offset.z]}>
+            {model && <primitive object={model} />}
+            {disassembled &&
+              labels.map((part) => (
+                <mesh key={`marker-${part.id}`} position={part.pos}>
+                  <sphereGeometry args={[0.006, 12, 12]} />
+                  <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={1.4} roughness={0.3} />
+                </mesh>
+              ))}
+            {selectedOrgan === 'skull' &&
+              labels.map((part) => (
+                <Html key={part.id} position={part.pos}>
+                  <div
+                    onClick={() => setSelectedHeartPart(part.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold shadow-lg border cursor-pointer whitespace-nowrap transition-all ${
+                      selectedHeartPart === part.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/40'
+                        : 'bg-slate-900/90 text-amber-200 border-amber-500/50 hover:bg-amber-500/20 hover:border-amber-400'
+                    }`}
+                  >
+                    {part.name}
+                  </div>
+                  {selectedHeartPart === part.id && (
+                    <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-lg shadow-xl text-left min-w-[200px] mt-2">
+                      <p className="text-xs font-semibold text-amber-400 mb-1 uppercase tracking-wider">{part.name}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{part.desc}</p>
+                    </div>
+                  )}
+                </Html>
+              ))}
+          </group>
+        </group>
+      </group>
+    );
+  };
+
   // ---------------- Circulatory System (real .glb model) ----------------
 
   const circulatoryLabels: Array<{ node: string; name: string }> = [
@@ -1231,6 +1366,7 @@ export default function App() {
       case 'heart': return <HeartMesh disassembled={disassembled} />;
       case 'lungs': return <LungsMesh disassembled={disassembled} />;
       case 'brain': return <BrainMesh disassembled={disassembled} />;
+      case 'skull': return <SkullMesh disassembled={disassembled} />;
       case 'liver': return <LiverMesh disassembled={disassembled} />;
       case 'kidneys': return <KidneysMesh disassembled={disassembled} />;
       case 'stomach': return <StomachMesh disassembled={disassembled} />;
