@@ -1,0 +1,64 @@
+Modelos 3D de fígado e rins
+===========================
+
+Este projeto usa seis arquivos GLB adicionais para os órgãos fígado e rins.
+Cada modelo mantém a licença e a atribuição originais, descritas abaixo.
+
+FÍGADO
+------
+
+1. liver-organui.glb
+   Obra original: BodyParts3D 4.0
+   Copyright: The Database Center for Life Science (DBCLS)
+   Fonte: OrganUI Liver 3D
+   https://github.com/organui/liver-3d
+   Commit: 528ee1794670d3bfa23d581f91ba49d6af585b03
+   Licença: Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)
+   https://creativecommons.org/licenses/by/4.0/
+   Alterações por OrganUI: seleção anatômica, agrupamento de estruturas,
+   centralização, rotação, escala uniforme, recálculo de normais, cores
+   ilustrativas e conversão OBJ para GLB.
+
+2. liver-innerscene.glb
+   Autor: Innerscene Corp (innerscene.com), adaptado de ativos MakeHuman CC0
+   Fonte: Innerscene 3D Parts Library
+   https://www.innerscene.com/tools/library/3d-parts/liver-ae1a8cc0
+   Licença: CC0 1.0 Universal (domínio público)
+   https://creativecommons.org/publicdomain/zero/1.0/
+
+3. liver-grab3d.glb
+   Autor: Grab3D
+   Fonte: https://grab3d.com/models/anatomy/human-liver/
+   Licença: CC0 1.0 Universal (domínio público)
+   https://creativecommons.org/publicdomain/zero/1.0/
+
+RINS
+----
+
+1. kidneys-organui.glb
+   Obra original: BodyParts3D 4.0
+   Copyright: The Database Center for Life Science (DBCLS)
+   Fonte: OrganUI Kidneys 3D
+   https://github.com/organui/kidneys-3d
+   Commit: 880b7c9cdf9f2272eee7741b01ccb34454adb30c
+   Licença: Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)
+   https://creativecommons.org/licenses/by/4.0/
+   Alterações por OrganUI: seleção anatômica, agrupamento de estruturas,
+   centralização, rotação, escala uniforme, recálculo de normais, cores
+   ilustrativas e conversão OBJ para GLB.
+
+2. kidneys-innerscene.glb
+   Autor: Innerscene Corp (innerscene.com), adaptado de ativos MakeHuman CC0
+   Fonte: Innerscene 3D Parts Library
+   https://www.innerscene.com/tools/library/3d-parts/kidneys-pair-c78928dd
+   Licença: CC0 1.0 Universal (domínio público)
+   https://creativecommons.org/publicdomain/zero/1.0/
+
+3. kidneys-grab3d.glb
+   Autor: Grab3D
+   Fonte: https://grab3d.com/models/anatomy/human-kidney/
+   Licença: CC0 1.0 Universal (domínio público)
+   https://creativecommons.org/publicdomain/zero/1.0/
+
+Modelos com licença CC BY exigem a manutenção do crédito acima quando
+redistribuídos ou adaptados. Modelos CC0 podem ser usados livremente.

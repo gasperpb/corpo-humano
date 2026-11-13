@@ -1,0 +1,8 @@
+Model: lymphatic-system-figure.glb
+
+Source: Innerscene 3D Parts Library
+https://www.innerscene.com/tools/library/3d-parts/lymphatic-system-figure-f810172c
+
+Author: Innerscene Corp (innerscene.com)
+License: CC0 1.0 Universal (public domain dedication)
+License text: https://creativecommons.org/publicdomain/zero/1.0/

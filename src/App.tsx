@@ -20,6 +20,118 @@ type CurlRig = {
   wrist: THREE.Group;
 };
 
+const arteryLabels: Array<{ node: string; name: string }> = [
+  { node: 'ascending-aorta', name: 'Aorta Ascendente' },
+  { node: 'aortic-arch', name: 'Arco Aórtico' },
+  { node: 'thoracic-aorta', name: 'Aorta Torácica' },
+  { node: 'abdominal-aorta', name: 'Aorta Abdominal' },
+  { node: 'brachiocephalic-trunk', name: 'Tronco Braquiocefálico' },
+  { node: 'carotid-arteries', name: 'Artérias Carótidas' },
+  { node: 'vertebral-arteries', name: 'Artérias Vertebrais' },
+  { node: 'subclavian-arteries', name: 'Artérias Subclávias' },
+  { node: 'brachial-arteries', name: 'Artérias Braquiais' },
+  { node: 'radial-arteries', name: 'Artérias Radiais' },
+  { node: 'ulnar-arteries', name: 'Artérias Ulnárias' },
+  { node: 'celiac-trunk', name: 'Tronco Celíaco' },
+  { node: 'hepatic-artery', name: 'Artéria Hepática' },
+  { node: 'renal-arteries', name: 'Artérias Renais' },
+  { node: 'common-iliac-arteries', name: 'Artérias Ilíacas Comuns' },
+  { node: 'femoral-arteries', name: 'Artérias Femorais' },
+  { node: 'popliteal-arteries', name: 'Artérias Poplíteas' },
+  { node: 'anterior-tibial-arteries', name: 'Artérias Tibiais Anteriores' },
+  { node: 'pulmonary-trunk', name: 'Tronco Pulmonar' },
+  { node: 'pulmonary-arteries', name: 'Artérias Pulmonares' },
+];
+
+const veinLabels: Array<{ node: string; name: string }> = [
+  { node: 'jugular-veins', name: 'Veias Jugulares' },
+  { node: 'superior-vena-cava', name: 'Veia Cava Superior' },
+  { node: 'inferior-vena-cava', name: 'Veia Cava Inferior' },
+  { node: 'brachiocephalic-veins', name: 'Veias Braquiocefálicas' },
+  { node: 'azygos-system', name: 'Sistema Ázigo' },
+  { node: 'pulmonary-veins', name: 'Veias Pulmonares' },
+  { node: 'subclavian-veins', name: 'Veias Subclávias' },
+  { node: 'axillary-veins', name: 'Veias Axilares' },
+  { node: 'cephalic-veins', name: 'Veias Cefálicas' },
+  { node: 'basilic-veins', name: 'Veias Basílicas' },
+  { node: 'renal-veins', name: 'Veias Renais' },
+  { node: 'portal-vein', name: 'Veia Porta' },
+  { node: 'splenic-mesenteric-veins', name: 'Veias Esplênicas e Mesentéricas' },
+  { node: 'common-iliac-veins', name: 'Veias Ilíacas Comuns' },
+  { node: 'femoral-veins', name: 'Veias Femorais' },
+  { node: 'popliteal-veins', name: 'Veias Poplíteas' },
+  { node: 'great-saphenous-veins', name: 'Veia Safena Magna' },
+  { node: 'small-saphenous-veins', name: 'Veia Safena Parva' },
+];
+
+const lymphaticLabels: Array<{ node: string; name: string }> = [
+  { node: 'Thoracic duct crossing to left venous angle', name: 'Ducto Torácico' },
+  { node: 'Cisterna chyli lymph collecting sac', name: 'Cisterna do Quilo' },
+  { node: 'Short right lymphatic duct', name: 'Ducto Linfático Direito' },
+  { node: 'Left axillary node 1', name: 'Linfonodos Axilares' },
+  { node: 'Left cervical node 1', name: 'Linfonodos Cervicais' },
+  { node: 'Left superficial inguinal node 1', name: 'Linfonodos Inguinais' },
+  { node: 'Left mesenteric node 1', name: 'Linfonodos Mesentéricos' },
+  { node: 'Left popliteal node', name: 'Linfonodos Poplíteos' },
+  { node: 'Left epitrochlear node', name: 'Linfonodos Epitrocleares' },
+  { node: 'Left palatine tonsil', name: 'Tonsila Palatina' },
+  { node: 'Left thymic lymphatic lobe', name: 'Timo' },
+  { node: 'Spleen left upper abdominal lymphatic organ', name: 'Baço' },
+  { node: 'Left lumbar lymphatic trunk', name: 'Tronco Linfático Lombar' },
+  { node: 'Left upper-limb collecting vessels', name: 'Vasos Linfáticos do Membro Superior' },
+  { node: 'Left lower-limb collecting lymphatics', name: 'Vasos Linfáticos do Membro Inferior' },
+];
+
+const liverOrganuiLabels: Array<{ node: string; name: string }> = [
+  { node: 'liver', name: 'Fígado' },
+  { node: 'gallbladder', name: 'Vesícula Biliar' },
+  { node: 'portal', name: 'Veia Porta' },
+  { node: 'hepatic-veins', name: 'Veias Hepáticas' },
+  { node: 'artery', name: 'Artéria Hepática' },
+  { node: 'biliary', name: 'Vias Biliares' },
+  { node: 'cystic', name: 'Ducto Cístico' },
+];
+
+const liverInnersceneLabels: Array<{ node: string; name: string }> = [
+  { node: 'Liver asymmetric lobes and falciform groove', name: 'Fígado' },
+];
+
+const liverGrab3dLabels: Array<{ node: string; name: string }> = [
+  { node: 'human-liver', name: 'Fígado (alta definição)' },
+];
+
+const kidneyOrganuiLabels: Array<{ node: string; name: string }> = [
+  { node: 'right-kidney', name: 'Rim Direito' },
+  { node: 'left-kidney', name: 'Rim Esquerdo' },
+  { node: 'right-ureter', name: 'Ureter Direito' },
+  { node: 'left-ureter', name: 'Ureter Esquerdo' },
+  { node: 'right-renal-artery', name: 'Artéria Renal Direita' },
+  { node: 'left-renal-artery', name: 'Artéria Renal Esquerda' },
+];
+
+const kidneyInnersceneLabels: Array<{ node: string; name: string }> = [
+  { node: 'Left kidney with hilar concavity', name: 'Rim Esquerdo' },
+  { node: 'Left renal pelvis and connected ureter', name: 'Pelve Renal e Ureter Esq.' },
+  { node: 'Right kidney with hilar concavity', name: 'Rim Direito' },
+  { node: 'Right renal pelvis and connected ureter', name: 'Pelve Renal e Ureter Dir.' },
+];
+
+const kidneyGrab3dLabels: Array<{ node: string; name: string }> = [
+  { node: 'human-kidney', name: 'Rim (corte anatômico)' },
+];
+
+const liverModelOptions = [
+  { url: '/models/liver-organui.glb', label: 'Modelo segmentado (fígado + vasos)', labels: liverOrganuiLabels, fitSize: 3.6, accent: 'text-amber-300 border-amber-500/50 hover:bg-amber-500/20 hover:border-amber-400' },
+  { url: '/models/liver-innerscene.glb', label: 'Anatomia completa (CC0)', labels: liverInnersceneLabels, fitSize: 3.4, accent: 'text-amber-300 border-amber-500/50 hover:bg-amber-500/20 hover:border-amber-400' },
+  { url: '/models/liver-grab3d.glb', label: 'Alta definição (CC0)', labels: liverGrab3dLabels, fitSize: 3.4, accent: 'text-amber-300 border-amber-500/50 hover:bg-amber-500/20 hover:border-amber-400' },
+];
+
+const kidneyModelOptions = [
+  { url: '/models/kidneys-organui.glb', label: 'Modelo segmentado (rins + ureteres)', labels: kidneyOrganuiLabels, fitSize: 3.6, accent: 'text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-400' },
+  { url: '/models/kidneys-innerscene.glb', label: 'Rins e pelve renal (CC0)', labels: kidneyInnersceneLabels, fitSize: 3.6, accent: 'text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-400' },
+  { url: '/models/kidneys-grab3d.glb', label: 'Corte anatômico (CC0)', labels: kidneyGrab3dLabels, fitSize: 3.4, accent: 'text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-400' },
+];
+
 export default function App() {
   const [selectedOrgan, setSelectedOrgan] = useState('biceps');
   const [selectedHeartPart, setSelectedHeartPart] = useState<string | null>(null);
@@ -30,6 +142,8 @@ export default function App() {
   const [heartRate, setHeartRate] = useState(72);
   const [heartModel, setHeartModel] = useState<1 | 2>(1);
   const [lungModel, setLungModel] = useState<1 | 2>(1);
+  const [liverModel, setLiverModel] = useState<1 | 2 | 3>(1);
+  const [kidneyModel, setKidneyModel] = useState<1 | 2 | 3>(1);
   const [bodyTemp, setBodyTemp] = useState(36.6);
   const [oxygenLevel, setOxygenLevel] = useState(98);
   const [notifications, setNotifications] = useState<Array<{ id: number; msg: string }>>([]);
@@ -73,7 +187,15 @@ export default function App() {
     toggleFullscreen();
   };
 
-  const organsData = {
+  const organsData: Record<string, {
+    name: string;
+    system: string;
+    weight: string;
+    color: string;
+    description: string;
+    clinicalNotes: string[];
+    layers: string[];
+  }> = {
     heart: {
       name: 'Coração (Heart)',
       system: 'Sistema Cardiovascular',
@@ -178,6 +300,45 @@ export default function App() {
       ],
       layers: ['Coração', 'Aorta', 'Artérias', 'Veias', 'Capilares'],
     },
+    arteries: {
+      name: 'Artérias (Arteries)',
+      system: 'Sistema Cardiovascular',
+      weight: 'Aprox. 100 mil km de vasos',
+      color: '#ef4444',
+      description: 'Vasos sanguíneos que conduzem o sangue do coração para os tecidos, ramificando-se em vasos cada vez menores até os capilares.',
+      clinicalNotes: [
+        'A aorta é a maior artéria do corpo, com cerca de 2,5 cm de diâmetro.',
+        'Suas paredes espessas e elásticas suportam a alta pressão do sangue.',
+        'As artérias pulmonares são a exceção: levam sangue desoxigenado aos pulmões.',
+      ],
+      layers: ['Aorta', 'Grandes Artérias', 'Artérias Musculares', 'Arteríolas', 'Capilares'],
+    },
+    veins: {
+      name: 'Veias (Veins)',
+      system: 'Sistema Cardiovascular / Venoso',
+      weight: 'Aprox. 70% do volume sanguíneo',
+      color: '#3b82f6',
+      description: 'Vasos que retornam o sangue dos tecidos ao coração, trabalhando sob baixa pressão e com válvulas que impedem o refluxo.',
+      clinicalNotes: [
+        'As veias cavas superior e inferior drenam o sangue para o átrio direito.',
+        'Válvulas venosas evitam o refluxo, especialmente nos membros inferiores.',
+        'Veias superficiais e profundas comunicam-se por meio de veias perfurantes.',
+      ],
+      layers: ['Veias Cavas', 'Veias Pulmonares', 'Veias Profundas', 'Veias Superficiais', 'Válvulas Venosas'],
+    },
+    lymphatic: {
+      name: 'Sistema Linfático',
+      system: 'Sistema Imunológico / Linfático',
+      weight: 'Aprox. 2 litros de linfa',
+      color: '#22c55e',
+      description: 'Rede de vasos linfáticos, linfonodos e órgãos linfoides que drena o excesso de líquido tecidual e atua na defesa imunológica do organismo.',
+      clinicalNotes: [
+        'O ducto torácico é o maior vaso linfático e desemboca no ângulo venoso esquerdo.',
+        'Contém cerca de 600 a 700 linfonodos distribuídos pelo corpo.',
+        'Baço, timo e tonsilas atuam como órgãos linfoides e participam da resposta imune.',
+      ],
+      layers: ['Capilares Linfáticos', 'Vasos Linfáticos', 'Linfonodos', 'Ducto Torácico', 'Baço e Timo'],
+    },
     biceps: {
       name: 'Bíceps Braquial',
       system: 'Sistema Muscular',
@@ -275,6 +436,34 @@ export default function App() {
     }, 3500);
   };
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+      const digit = Number(event.key);
+      if (!Number.isInteger(digit) || digit < 1 || digit > 3) return;
+
+      if (selectedOrgan === 'liver') {
+        setLiverModel(digit as 1 | 2 | 3);
+        addNotification(`Fígado: modelo ${digit} — ${liverModelOptions[digit - 1].label}`);
+      } else if (selectedOrgan === 'kidneys') {
+        setKidneyModel(digit as 1 | 2 | 3);
+        addNotification(`Rins: modelo ${digit} — ${kidneyModelOptions[digit - 1].label}`);
+      } else if (selectedOrgan === 'heart' && digit <= 2) {
+        setHeartModel(digit as 1 | 2);
+        addNotification(digit === 1 ? 'Coração: modelo 3D interativo (GLB)' : 'Coração: modelo animado do Sketchfab');
+      } else if (selectedOrgan === 'lungs' && digit <= 2) {
+        setLungModel(digit as 1 | 2);
+        addNotification(digit === 1 ? 'Pulmões: modelo 3D interativo (GLB)' : 'Pulmões: modelo do Sketchfab');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedOrgan]);
+
   // ---------------- Organ components (R3F + realistic geometry) ----------------
 
   const HeartMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
@@ -330,12 +519,15 @@ export default function App() {
       });
     }, [scene, disassembled, heartFragments]);
 
-    useFrame((state: any, delta: number) => {
+    useFrame((state: any) => {
       if (!groupRef.current) return;
       if (!disassembled) {
         groupRef.current.rotation.y += rotationSpeed;
         if (selectedOrgan === 'heart') {
-          const pulse = 1 + Math.sin(state.elapsedTime * (heartRate / 15)) * 0.05;
+          const cycle = (state.elapsedTime * (heartRate / 60)) % 1;
+          const lub = Math.exp(-Math.pow((cycle - 0.08) / 0.045, 2));
+          const dub = Math.exp(-Math.pow((cycle - 0.28) / 0.055, 2)) * 0.55;
+          const pulse = 1 + (lub + dub) * 0.075;
           groupRef.current.scale.set(pulse, pulse, pulse);
         } else {
           groupRef.current.scale.set(1, 1, 1);
@@ -1072,6 +1264,250 @@ export default function App() {
     );
   };
 
+  // ---------------- Arteries / Veins (real .glb model) ----------------
+
+  const VesselModel: React.FC<{
+    kind: 'artery' | 'vein';
+    labels: Array<{ node: string; name: string }>;
+    accent: string;
+    fitSize: number;
+    disassembled: boolean;
+  }> = ({ kind, labels, accent, fitSize, disassembled }) => {
+    const wrapperRef = useRef<THREE.Group>(null);
+    const labelRefs = useRef<Array<THREE.Group | null>>([]);
+    const { scene } = useGLTF('/models/vessels.glb');
+
+    const { model, scale, offset, parts, movers, explodeDist } = useMemo(() => {
+      if (!scene) {
+        return {
+          model: null as THREE.Object3D | null,
+          scale: 1,
+          offset: new THREE.Vector3(),
+          parts: [] as AnatomyPart[],
+          movers: [] as Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }>,
+          explodeDist: 0,
+        };
+      }
+
+      const clone = scene.clone(true);
+      const selected: THREE.Object3D[] = [];
+      clone.traverse((child: any) => {
+        if (child.isMesh) child.visible = false;
+      });
+      clone.traverse((child: any) => {
+        if (child.userData?.kind !== kind) return;
+        selected.push(child);
+        child.traverse((c: any) => {
+          if (c.isMesh) c.visible = true;
+        });
+      });
+      clone.traverse((child: any) => {
+        if (!child.isMesh) return;
+        child.material = child.material.clone();
+        child.material.needsUpdate = true;
+      });
+      clone.updateMatrixWorld(true);
+
+      const bounds = new THREE.Box3();
+      selected.forEach((node) => bounds.expandByObject(node));
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const fitScale = fitSize / maxDim;
+
+      const movers: Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }> = [];
+      selected.forEach((node) => {
+        node.traverse((o: any) => {
+          if (!o.isMesh) return;
+          const mb = new THREE.Box3().setFromObject(o);
+          const mc = mb.getCenter(new THREE.Vector3());
+          const dir = mc.clone().sub(center);
+          if (dir.lengthSq() < 1e-9) dir.set(0, 0, 0);
+          else dir.normalize();
+          movers.push({ mesh: o, dir });
+        });
+      });
+
+      const parts = labels
+        .map(({ node, name }) => {
+          const mesh = clone.getObjectByName(node);
+          if (!mesh) return null;
+          const mb = new THREE.Box3().setFromObject(mesh);
+          const mc = mb.getCenter(new THREE.Vector3());
+          return { id: node, name, mesh, center: mc, kind: 'other' as const };
+        })
+        .filter(Boolean) as AnatomyPart[];
+
+      return {
+        model: clone,
+        scale: fitScale,
+        offset: new THREE.Vector3(-center.x * fitScale, -center.y * fitScale, -center.z * fitScale),
+        parts,
+        movers,
+        explodeDist: maxDim * 0.45,
+      };
+    }, [scene, kind, fitSize, labels]);
+
+    useFrame(() => {
+      if (!wrapperRef.current) return;
+      if (!disassembled) wrapperRef.current.rotation.y += 0.003;
+      const target = new THREE.Vector3();
+      movers.forEach(({ mesh, dir }) => {
+        if (disassembled) target.copy(dir).multiplyScalar(explodeDist);
+        else target.set(0, 0, 0);
+        mesh.position.lerp(target, 0.08);
+      });
+      parts.forEach((part, i) => {
+        const g = labelRefs.current[i];
+        if (g) g.position.copy(part.center).add(part.mesh.position);
+      });
+    });
+
+    return (
+      <group dispose={null}>
+        <ambientLight intensity={1.2} />
+        <pointLight position={[0, 0, 5]} intensity={2} />
+        <group ref={wrapperRef} dispose={null}>
+          <group scale={scale} position={[offset.x, offset.y, offset.z]}>
+            {model && <primitive object={model} />}
+            {parts.map((part, i) => (
+              <group
+                key={part.id}
+                ref={(el) => { labelRefs.current[i] = el; }}
+                position={[part.center.x, part.center.y, part.center.z]}
+              >
+                <Html position={[0, 0, 0]}>
+                  <div
+                    onClick={() => addNotification(`Selecionado: ${part.name}`)}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold shadow-lg border cursor-pointer whitespace-nowrap bg-slate-900/90 ${accent} transition-all`}
+                  >
+                    {part.name}
+                  </div>
+                </Html>
+              </group>
+            ))}
+          </group>
+        </group>
+      </group>
+    );
+  };
+
+  // ---------------- Lymphatic System (real .glb model) ----------------
+
+  const LymphaticMesh: React.FC<{ disassembled: boolean }> = ({ disassembled }) => {
+    const wrapperRef = useRef<THREE.Group>(null);
+    const labelRefs = useRef<Array<THREE.Group | null>>([]);
+    const { scene } = useGLTF('/models/lymphatic-system-figure.glb');
+
+    const { model, scale, offset, parts, movers, explodeDist } = useMemo(() => {
+      if (!scene) {
+        return {
+          model: null as THREE.Object3D | null,
+          scale: 1,
+          offset: new THREE.Vector3(),
+          parts: [] as AnatomyPart[],
+          movers: [] as Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }>,
+          explodeDist: 0,
+        };
+      }
+
+      const clone = scene.clone(true);
+      clone.traverse((child: any) => {
+        if (!child.isMesh) return;
+        const materialName: string = child.material?.name ?? '';
+        const isEnvelope = child.name.includes('MakeHuman') || materialName.includes('envelope');
+        child.visible = !isEnvelope;
+        child.material = child.material.clone();
+        child.material.needsUpdate = true;
+      });
+      clone.updateMatrixWorld(true);
+
+      const visibleMeshes: THREE.Object3D[] = [];
+      clone.traverse((o: any) => {
+        if (o.isMesh && o.visible) visibleMeshes.push(o);
+      });
+
+      const bounds = new THREE.Box3();
+      visibleMeshes.forEach((mesh) => bounds.expandByObject(mesh));
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const fitScale = 3.5 / maxDim;
+
+      const movers: Array<{ mesh: THREE.Object3D; dir: THREE.Vector3 }> = [];
+      visibleMeshes.forEach((mesh) => {
+        const mb = new THREE.Box3().setFromObject(mesh);
+        const mc = mb.getCenter(new THREE.Vector3());
+        const dir = mc.clone().sub(center);
+        if (dir.lengthSq() < 1e-9) dir.set(0, 0, 0);
+        else dir.normalize();
+        movers.push({ mesh, dir });
+      });
+
+      const parts = lymphaticLabels
+        .map(({ node, name }) => {
+          const mesh = clone.getObjectByName(node);
+          if (!mesh) return null;
+          const mb = new THREE.Box3().setFromObject(mesh);
+          const mc = mb.getCenter(new THREE.Vector3());
+          return { id: node, name, mesh, center: mc, kind: 'other' as const };
+        })
+        .filter(Boolean) as AnatomyPart[];
+
+      return {
+        model: clone,
+        scale: fitScale,
+        offset: new THREE.Vector3(-center.x * fitScale, -center.y * fitScale, -center.z * fitScale),
+        parts,
+        movers,
+        explodeDist: maxDim * 0.35,
+      };
+    }, [scene]);
+
+    useFrame(() => {
+      if (!wrapperRef.current) return;
+      if (!disassembled) wrapperRef.current.rotation.y += 0.003;
+      const target = new THREE.Vector3();
+      movers.forEach(({ mesh, dir }) => {
+        if (disassembled) target.copy(dir).multiplyScalar(explodeDist);
+        else target.set(0, 0, 0);
+        mesh.position.lerp(target, 0.08);
+      });
+      parts.forEach((part, i) => {
+        const g = labelRefs.current[i];
+        if (g) g.position.copy(part.center).add(part.mesh.position);
+      });
+    });
+
+    return (
+      <group dispose={null}>
+        <ambientLight intensity={1.5} />
+        <pointLight position={[0, 0, 5]} intensity={2} />
+        <group ref={wrapperRef} dispose={null}>
+          <group scale={scale} position={[offset.x, offset.y, offset.z]}>
+            {model && <primitive object={model} />}
+            {parts.map((part, i) => (
+              <group
+                key={part.id}
+                ref={(el) => { labelRefs.current[i] = el; }}
+                position={[part.center.x, part.center.y, part.center.z]}
+              >
+                <Html position={[0, 0, 0]}>
+                  <div
+                    onClick={() => addNotification(`Selecionado: ${part.name}`)}
+                    className="px-2 py-1 rounded-md text-[10px] font-bold shadow-lg border cursor-pointer whitespace-nowrap bg-slate-900/90 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-400 transition-all"
+                  >
+                    {part.name}
+                  </div>
+                </Html>
+              </group>
+            ))}
+          </group>
+        </group>
+      </group>
+    );
+  };
+
   // ---------------- Generic GLB anatomy (real model + labels + teardown) ----------------
 
   const bicepsLabels: Array<{ node: string; name: string }> = [
@@ -1367,10 +1803,53 @@ export default function App() {
       case 'lungs': return <LungsMesh disassembled={disassembled} />;
       case 'brain': return <BrainMesh disassembled={disassembled} />;
       case 'skull': return <SkullMesh disassembled={disassembled} />;
-      case 'liver': return <LiverMesh disassembled={disassembled} />;
-      case 'kidneys': return <KidneysMesh disassembled={disassembled} />;
+      case 'liver': {
+        const model = liverModelOptions[liverModel - 1];
+        return (
+          <AnatomyModel
+            key={model.url}
+            url={model.url}
+            labels={model.labels}
+            fitSize={model.fitSize}
+            accent={model.accent}
+            disassembled={disassembled}
+          />
+        );
+      }
+      case 'kidneys': {
+        const model = kidneyModelOptions[kidneyModel - 1];
+        return (
+          <AnatomyModel
+            key={model.url}
+            url={model.url}
+            labels={model.labels}
+            fitSize={model.fitSize}
+            accent={model.accent}
+            disassembled={disassembled}
+          />
+        );
+      }
       case 'stomach': return <StomachMesh disassembled={disassembled} />;
       case 'circulatory': return <CirculatoryMesh disassembled={disassembled} />;
+      case 'arteries': return (
+        <VesselModel
+          kind="artery"
+          labels={arteryLabels}
+          accent="text-red-300 border-red-500/50 hover:bg-red-500/20 hover:border-red-400"
+          fitSize={4}
+          disassembled={disassembled}
+        />
+      );
+      case 'veins': return (
+        <VesselModel
+          kind="vein"
+          labels={veinLabels}
+          accent="text-blue-300 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-400"
+          fitSize={4}
+          disassembled={disassembled}
+        />
+      );
+      case 'lymphatic': return <LymphaticMesh disassembled={disassembled} />;
       case 'biceps': return (
         <AnatomyModel
           url="/models/right-biceps-brachii.glb"
@@ -1567,6 +2046,30 @@ export default function App() {
                     </button>
                   </div>
                 )}
+                {(selectedOrgan === 'liver' || selectedOrgan === 'kidneys') && (
+                  <div className="flex items-center gap-1 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 p-1 rounded-xl shadow-lg">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1.5">Modelo:</span>
+                    {[1, 2, 3].map((n) => {
+                      const options = selectedOrgan === 'liver' ? liverModelOptions : kidneyModelOptions;
+                      const current = selectedOrgan === 'liver' ? liverModel : kidneyModel;
+                      return (
+                        <button
+                          key={n}
+                          title={options[n - 1].label}
+                          onClick={() => {
+                            if (selectedOrgan === 'liver') setLiverModel(n as 1 | 2 | 3);
+                            else setKidneyModel(n as 1 | 2 | 3);
+                            addNotification(`${selectedOrgan === 'liver' ? 'Fígado' : 'Rins'}: modelo ${n} — ${options[n - 1].label}`);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${current === n ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          {n}
+                        </button>
+                      );
+                    })}
+                    <span className="text-[10px] font-mono text-slate-500 px-1 hidden sm:inline">teclas 1-3</span>
+                  </div>
+                )}
                 {selectedOrgan === 'biceps' && !disassembled && (
                   <button
                     onClick={() => {
@@ -1641,7 +2144,7 @@ export default function App() {
                 <ambientLight intensity={1.2} />
                 <directionalLight position={[5, 10, 7]} intensity={1.2} />
                 <pointLight position={[-5, -5, -5]} intensity={2} color="#38bdf8" distance={50} />
-                <Environment preset="city" intensity={0.3} />
+                <Environment preset="city" environmentIntensity={0.3} />
                 <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
                 <OrbitControls enableZoom enablePan makeDefault />
                 <Suspense fallback={null}>
@@ -1669,17 +2172,36 @@ export default function App() {
 
             {!embedSrc && (
             <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 p-4 rounded-xl shadow-lg pointer-events-auto">
-              <div className="flex items-center gap-4 w-full md:w-auto">
-                <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Velocidade de Rotação:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="0.02"
-                  step="0.001"
-                  value={rotationSpeed}
-                  onChange={(e) => setRotationSpeed(parseFloat(e.target.value))}
-                  className="accent-cyan-500 w-full md:w-32 cursor-pointer"
-                />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 w-full md:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Rotação:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.02"
+                    step="0.001"
+                    value={rotationSpeed}
+                    onChange={(e) => setRotationSpeed(parseFloat(e.target.value))}
+                    className="accent-cyan-500 w-24 md:w-28 cursor-pointer"
+                  />
+                </div>
+                {selectedOrgan === 'heart' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Batimentos:</span>
+                    <input
+                      type="range"
+                      min="50"
+                      max="140"
+                      value={heartRate}
+                      onChange={(e) => {
+                        setHeartRate(parseInt(e.target.value));
+                        if (heartModel === 2) setHeartModel(1);
+                      }}
+                      className="accent-rose-500 w-24 md:w-28 cursor-pointer"
+                    />
+                    <span className="text-xs font-mono font-bold text-rose-400 w-14 text-right">{heartRate} BPM</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Camadas:</span>
@@ -1718,7 +2240,10 @@ export default function App() {
                     min="50"
                     max="140"
                     value={heartRate}
-                    onChange={(e) => setHeartRate(parseInt(e.target.value))}
+                    onChange={(e) => {
+                      setHeartRate(parseInt(e.target.value));
+                      if (heartModel === 2) setHeartModel(1);
+                    }}
                     className="accent-rose-500 cursor-pointer"
                   />
                 </div>
@@ -1770,6 +2295,9 @@ export default function App() {
         <p className="mt-1 text-slate-400">
           Desenvolvido por{' '}
           <a href="https://www.linkedin.com/in/achillesdev" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Achillesdev</a>
+        </p>
+        <p className="mt-1 text-slate-500">
+          Modelos: BodyParts3D / DBCLS (CC BY-SA 2.1 JP e CC BY 4.0) • OrganUI (CC BY 4.0) • Innerscene (CC0) • Grab3D (CC0)
         </p>
       </footer>
     </div>

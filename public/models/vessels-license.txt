@@ -1,0 +1,11 @@
+Model: vessels.glb
+
+Original data: BodyParts3D / Anatomography, (c) The Database Center for Life Science (DBCLS).
+Source: OrganUI Vessels - https://github.com/organui/vessels-3d
+License: Creative Commons Attribution-ShareAlike 2.1 Japan (CC BY-SA 2.1 JP)
+License text: https://creativecommons.org/licenses/by-sa/2.1/jp/
+
+Changes by OrganUI: curated subset of BodyParts3D 4.3 (52 structures), simplified and
+recolored, converted to glTF binary. This project uses the model as-is.
+
+The model data remains under CC BY-SA 2.1 Japan, separately from the application code.
